@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "AcademicRepository": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7145;http://localhost:5145",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    }
+  }
+}

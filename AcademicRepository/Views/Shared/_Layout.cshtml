@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>@ViewData["Title"] - Academic Repository</title>
+<link rel="stylesheet" href="~/lib/bootstrap/bootstrap.min.css" />
+</head>
+<body>
+<nav class="navbar navbar-dark bg-primary mb-4"><div class="container d-flex flex-wrap gap-3">
+<a class="navbar-brand" asp-controller="Home" asp-action="Index">Academic Repository</a>
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <a class="text-white" asp-controller="Home" asp-action="Index">Home</a>
+    @foreach (var role in AcademicRepository.Data.IdentitySeeder.Roles)
+    {
+        if (User.IsInRole(role))
+        {
+            var action = role switch { "Student" => "MySubmissions", "Coordinator" => "Submissions", "DepartmentHead" => "Repository", _ => "Administration" };
+            var label = role == "Student" ? "My Submissions" : action;
+            <a class="text-white" asp-controller="@role" asp-action="Dashboard">@role Dashboard</a>
+            if (role == "Admin")
+            {
+                <a class="text-white" asp-controller="Departments" asp-action="Index">Departments</a>
+                <a class="text-white" asp-controller="Users" asp-action="Index">Users</a>
+            }
+            else
+            {
+                <a class="text-white" asp-controller="@role" asp-action="@action">@label</a>
+            }
+        }
+    }
+    <form asp-controller="Account" asp-action="Logout" method="post" class="ms-auto"><button class="btn btn-outline-light" type="submit">Logout</button></form>
+}
+else { <a class="text-white" asp-controller="Account" asp-action="Login">Login</a> }
+</div></nav>
+<main class="container">
+@if (TempData["Status"] is string status) { <div class="alert alert-success" role="status">@status</div> }
+@if (TempData["Error"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
+@RenderBody()</main>
+</body></html>

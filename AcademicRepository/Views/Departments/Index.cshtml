@@ -1,0 +1,13 @@
+@model IReadOnlyList<DepartmentListViewModel>
+@{ ViewData["Title"] = "Departments"; }
+<div class="d-flex justify-content-between align-items-center mb-3"><h1>Departments</h1><a class="btn btn-primary" asp-action="Create">Create Department</a></div>
+<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Code</th><th>Name</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+@foreach (var department in Model)
+{
+    <tr><td>@department.Code</td><td>@department.Name</td><td>@(department.IsActive ? "Active" : "Inactive")</td><td>
+        <a asp-action="Details" asp-route-id="@department.Id">Details</a> | <a asp-action="Edit" asp-route-id="@department.Id">Edit</a>
+        <form class="d-inline ms-2" asp-action="SetActive" asp-route-id="@department.Id" method="post"><input type="hidden" name="isActive" value="@((!department.IsActive).ToString())" /><button class="btn btn-sm btn-outline-secondary">@(department.IsActive ? "Deactivate" : "Activate")</button></form>
+    </td></tr>
+}
+</tbody></table></div>
+@if (Model.Count == 0) { <p>No departments yet.</p> }

@@ -1,0 +1,4 @@
+@model string
+@{ ViewData["Title"] = Model + " Dashboard"; }
+<h1>Academic Project Repository</h1><h2>@Model Dashboard</h2>
+<p>Welcome, @User.Identity?.Name</p><p>Role: @Model</p>

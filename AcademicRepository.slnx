@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AcademicRepository.Tests/AcademicRepository.Tests.csproj" />
+  <Project Path="AcademicRepository/AcademicRepository.csproj" />
+</Solution>
