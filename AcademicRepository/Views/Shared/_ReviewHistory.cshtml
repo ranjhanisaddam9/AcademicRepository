@@ -1,0 +1,20 @@
+@model IReadOnlyList<ReviewHistoryItem>
+<section class="mt-4 border-top pt-3"><h2>Review History</h2>
+@if (Model.Count == 0) { <p>No reviews have been recorded.</p> }
+@foreach (var review in Model)
+{
+<article class="card mb-3"><div class="card-body">
+<h3 class="h5">Round @review.ReviewRound — @review.Decision</h3>
+<dl class="row mb-0">
+@if (review.VersionId is not null)
+{
+<dt class="col-sm-3">Submitted Version</dt><dd class="col-sm-9"><a asp-controller="SubmissionVersions" asp-action="Details" asp-route-id="@review.VersionId">Version @review.ReviewRound — metadata and files submitted</a></dd>
+<dt class="col-sm-3">Submitted (UTC)</dt><dd class="col-sm-9">@review.SubmittedAt?.ToString("u")</dd>
+}
+<dt class="col-sm-3">Reviewer</dt><dd class="col-sm-9">@review.ReviewerName</dd>
+<dt class="col-sm-3">Started (UTC)</dt><dd class="col-sm-9">@review.StartedAt.ToString("u")</dd>
+<dt class="col-sm-3">Completed (UTC)</dt><dd class="col-sm-9">@(review.CompletedAt?.ToString("u") ?? "Pending")</dd>
+<dt class="col-sm-3">Comments</dt><dd class="col-sm-9" style="white-space:pre-wrap">@(review.Comments ?? "No comments provided.")</dd>
+</dl></div></article>
+}
+</section>

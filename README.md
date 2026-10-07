@@ -1,4 +1,8 @@
-# AcademicRepository — Milestones 1, 2, 3, 3.5 and 4
+# AcademicRepository — Milestones 1, 2, 3, 3.5, 4, 5 and 6
+
+Milestone 6 adds rejected-submission revision, resubmission and immutable metadata/resource versions. Read feedback on Details, Start Revision, edit metadata/manage resources, then Resubmit from Edit Revision. Department and project type remain locked. Historical files remain available through authorized version pages, and new reviews link to new versions. See [MILESTONE6.md](MILESTONE6.md) for migration, tests, preservation evidence and legacy notes. The integration harness now covers Milestones 1–6.
+
+Milestone 5 adds department-scoped Coordinator dashboards, review queues, filters, pagination and secure resource downloads. Explicit Start Review creates a pending history record; its initiating Coordinator can approve or reject it. Rejection requires comments. Students can see their own review history; reviewed submissions remain frozen. See [MILESTONE5.md](MILESTONE5.md) for schema, migration, verification and known legacy data. The integration harness now covers Milestones 1–5.
 
 Milestone 4 adds private academic resource uploads to existing Student submissions. See [MILESTONE4.md](MILESTONE4.md) for verification, storage settings, migration, tests and deployment notes. Save a draft, add resources on Details/Edit, then submit. Newly submitted drafts require at least one resource; submitted packages are read-only. Existing submitted records without files are preserved.
 

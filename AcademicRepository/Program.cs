@@ -45,6 +45,9 @@ builder.Services.AddScoped<StudentSubmissionService>();
 builder.Services.AddScoped<StudentDepartmentService>();
 builder.Services.AddScoped<SubmissionLock>();
 builder.Services.AddScoped<ProjectFileService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<SubmissionWorkflowService>();
+builder.Services.AddScoped<SubmissionVersionService>();
 builder.Services.AddSingleton<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddOptions<FileStorageOptions>().BindConfiguration("FileStorage").ValidateDataAnnotations().ValidateOnStart();
 var uploadLimit = builder.Configuration.GetValue<int?>("FileStorage:MaxFileSizeMB") ?? 50;
@@ -64,6 +67,12 @@ builder.Services.ConfigureApplicationCookie(options =>
         var user = context.Principal is null ? null : await users.GetUserAsync(context.Principal);
         var stampType = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Options.IOptions<IdentityOptions>>().Value.ClaimsIdentity.SecurityStampClaimType;
         var roles = user is null ? Array.Empty<string>() : (await users.GetRolesAsync(user)).ToArray();
+        if (user is not null && roles.Contains("Coordinator") && user.DepartmentId is null)
+        {
+            var tempData = context.HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataDictionaryFactory>().GetTempData(context.HttpContext);
+            tempData["Error"] = "Your Coordinator account has no department assigned. Contact your administrator before reviewing submissions.";
+            tempData.Save();
+        }
         if (user is null || !ApplicationRoles.CanAuthenticate(user, roles) || context.Principal!.FindFirstValue(stampType) != user.SecurityStamp
             || (roles.Contains("Student") && !await context.HttpContext.RequestServices.GetRequiredService<StudentDepartmentService>().MatchesAsync(user)))
         {

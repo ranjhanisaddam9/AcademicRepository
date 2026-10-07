@@ -16,12 +16,6 @@ public class StudentController(DashboardService dashboard, StudentSubmissionServ
     }
     public IActionResult MySubmissions() => RedirectToAction("Index", "StudentSubmissions");
 }
-[Authorize(Roles = "Coordinator")]
-public class CoordinatorController(DashboardService dashboard) : Controller
-{
-    public async Task<IActionResult> Dashboard() => View("~/Views/Home/Index.cshtml", await dashboard.GetAsync(User));
-    public IActionResult Submissions() => View("~/Views/Shared/Placeholder.cshtml", "Submissions");
-}
 [Authorize(Roles = "DepartmentHead")]
 public class DepartmentHeadController(DashboardService dashboard) : Controller
 {

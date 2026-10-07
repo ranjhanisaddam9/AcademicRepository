@@ -1,0 +1,25 @@
+@model VersionDetailsViewModel
+@{ ViewData["Title"] = $"Submitted Version {Model.VersionNumber}"; }
+<h1>Submitted Version @Model.VersionNumber</h1>
+<p class="alert alert-info">This is an immutable snapshot of the submitted metadata and resource set.</p>
+<h2>@Model.Project.Title</h2>
+<dl class="row">
+<dt class="col-sm-3">Student</dt><dd class="col-sm-9">@Model.Project.StudentName</dd>
+<dt class="col-sm-3">Department</dt><dd class="col-sm-9">@Model.Project.Department</dd>
+<dt class="col-sm-3">Project Type</dt><dd class="col-sm-9">@Html.DisplayFor(m => m.Project.ProjectType)</dd>
+<dt class="col-sm-3">Submitted (UTC)</dt><dd class="col-sm-9">@Model.Project.SubmittedAt?.ToString("u")</dd>
+<dt class="col-sm-3">Abstract</dt><dd class="col-sm-9" style="white-space:pre-wrap">@Model.Project.Abstract</dd>
+<dt class="col-sm-3">Keywords</dt><dd class="col-sm-9">@Model.Project.Keywords</dd>
+<dt class="col-sm-3">Supervisor</dt><dd class="col-sm-9">@Model.Project.SupervisorName</dd>
+<dt class="col-sm-3">Course</dt><dd class="col-sm-9">@Model.Project.CourseName</dd>
+<dt class="col-sm-3">Course Code</dt><dd class="col-sm-9">@Model.Project.CourseCode</dd>
+<dt class="col-sm-3">Academic Year</dt><dd class="col-sm-9">@Model.Project.AcademicYear</dd>
+<dt class="col-sm-3">Semester</dt><dd class="col-sm-9">@Model.Project.Semester</dd>
+</dl>
+<h2>Files submitted</h2>
+<table class="table"><thead><tr><th>File</th><th>Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th></th></tr></thead><tbody>
+@foreach (var file in Model.Files) { <tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td><a asp-action="Download" asp-route-id="@Model.Id" asp-route-fileId="@file.Id">Download</a></td></tr> }
+</tbody></table>
+<partial name="_ReviewHistory" model="Model.Reviews" />
+@if (User.IsInRole("Coordinator")) { <a asp-controller="Coordinator" asp-action="ReviewQueue">Back to Review Queue</a> }
+else { <a asp-controller="StudentSubmissions" asp-action="Details" asp-route-id="@Model.Project.Id">Back to Submission</a> }

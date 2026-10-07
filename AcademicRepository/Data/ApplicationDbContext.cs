@@ -11,12 +11,57 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ProjectSubmission> ProjectSubmissions => Set<ProjectSubmission>();
     public DbSet<AuthenticationCode> AuthenticationCodes => Set<AuthenticationCode>();
     public DbSet<ProjectFile> ProjectFiles => Set<ProjectFile>();
+    public DbSet<SubmissionReview> SubmissionReviews => Set<SubmissionReview>();
+    public DbSet<SubmissionVersion> SubmissionVersions => Set<SubmissionVersion>();
+    public DbSet<SubmissionVersionFile> SubmissionVersionFiles => Set<SubmissionVersionFile>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+        builder.Entity<SubmissionVersion>(entity =>
+        {
+            entity.HasIndex(v => new { v.ProjectSubmissionId, v.VersionNumber }).IsUnique();
+            entity.ToTable(t => t.HasCheckConstraint("CK_SubmissionVersions_Number", "[VersionNumber] >= 1"));
+            entity.Property(v => v.CreatedByUserId).HasMaxLength(450);
+            entity.Property(v => v.TitleSnapshot).HasMaxLength(250);
+            entity.Property(v => v.AbstractSnapshot).HasMaxLength(10000);
+            entity.Property(v => v.KeywordsSnapshot).HasMaxLength(1000);
+            entity.Property(v => v.SupervisorNameSnapshot).HasMaxLength(150);
+            entity.Property(v => v.CourseNameSnapshot).HasMaxLength(150);
+            entity.Property(v => v.CourseCodeSnapshot).HasMaxLength(30);
+            entity.Property(v => v.AcademicYearSnapshot).HasMaxLength(30);
+            entity.Property(v => v.SemesterSnapshot).HasMaxLength(50);
+            entity.HasOne(v => v.ProjectSubmission).WithMany().HasForeignKey(v => v.ProjectSubmissionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(v => v.Department).WithMany().HasForeignKey(v => v.DepartmentIdSnapshot).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(v => v.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<SubmissionVersionFile>(entity =>
+        {
+            entity.HasKey(f => new { f.SubmissionVersionId, f.ProjectFileId });
+            entity.HasOne(f => f.SubmissionVersion).WithMany(v => v.Files).HasForeignKey(f => f.SubmissionVersionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(f => f.ProjectFile).WithMany().HasForeignKey(f => f.ProjectFileId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<SubmissionReview>(entity =>
+        {
+            entity.HasOne(r => r.SubmissionVersion).WithMany().HasForeignKey(r => r.SubmissionVersionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(r => r.SubmissionVersionId).IsUnique().HasFilter("[SubmissionVersionId] IS NOT NULL");
+            entity.Property(r => r.ReviewerId).HasMaxLength(450).IsRequired();
+            entity.Property(r => r.Comments).HasMaxLength(2000);
+            entity.Property(r => r.RowVersion).IsRowVersion();
+            entity.HasOne(r => r.ProjectSubmission).WithMany(s => s.Reviews).HasForeignKey(r => r.ProjectSubmissionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(r => r.Reviewer).WithMany().HasForeignKey(r => r.ReviewerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(r => new { r.ProjectSubmissionId, r.ReviewRound }).IsUnique();
+            entity.HasIndex(r => r.ProjectSubmissionId).HasDatabaseName("IX_SubmissionReviews_OnePending").IsUnique().HasFilter("[Decision] = 0");
+            entity.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_SubmissionReviews_Round", "[ReviewRound] >= 1");
+                t.HasCheckConstraint("CK_SubmissionReviews_Decision", "([Decision] = 0 AND [CompletedAt] IS NULL) OR ([Decision] IN (1,2) AND [CompletedAt] IS NOT NULL)");
+                t.HasCheckConstraint("CK_SubmissionReviews_RejectionComments", "[Decision] <> 2 OR ([Comments] IS NOT NULL AND LEN(LTRIM(RTRIM([Comments]))) > 0)");
+            });
+        });
         builder.Entity<ProjectFile>(entity =>
         {
+            entity.Property(f => f.IsActive).HasDefaultValue(true);
             entity.Property(f => f.OriginalFileName).HasMaxLength(255).IsRequired();
             entity.Property(f => f.StoredFileName).HasMaxLength(64).IsRequired();
             entity.HasIndex(f => f.StoredFileName).IsUnique();

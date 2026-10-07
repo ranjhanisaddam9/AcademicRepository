@@ -1,11 +1,11 @@
 @model EditSubmissionViewModel
-@{ ViewData["Title"] = "Edit Draft"; }
-<h1>Edit Draft</h1>
+@{ var revision = ViewData["Revision"] is true; ViewData["Title"] = revision ? "Edit Revision" : "Edit Draft"; }
+<h1>@ViewData["Title"]</h1>
 <form asp-action="Edit" asp-route-id="@ViewContext.RouteData.Values["id"]" method="post" style="max-width:850px">
 <input asp-for="EditToken" type="hidden" />
 <partial name="_Fields" model="Model" />
-<button class="btn btn-secondary" name="intent" value="SaveDraft" type="submit">Save Draft</button>
-<button class="btn btn-primary" name="intent" value="Submit" type="submit">Submit</button>
+<button class="btn btn-secondary" name="intent" value="SaveDraft" type="submit">@(revision ? "Save Revision" : "Save Draft")</button>
+<button class="btn btn-primary" name="intent" value="Submit" type="submit">@(revision ? "Resubmit" : "Submit")</button>
 <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
 </form>
 @await Component.InvokeAsync("ProjectResources", new { submissionId = int.Parse(ViewContext.RouteData.Values["id"]!.ToString()!) })

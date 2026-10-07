@@ -47,4 +47,4 @@ public sealed class DeleteSubmissionViewModel
 }
 
 public sealed record StudentDashboardViewModel(DashboardViewModel Profile, int Total, int Drafts, int Submitted,
-    int Approved, int Rejected, IReadOnlyList<SubmissionListViewModel> Recent);
+    int Approved, int Rejected, IReadOnlyList<SubmissionListViewModel> Recent, int Revisions = 0);

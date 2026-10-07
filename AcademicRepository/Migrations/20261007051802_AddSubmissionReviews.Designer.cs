@@ -4,6 +4,7 @@ using AcademicRepository.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AcademicRepository.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007051802_AddSubmissionReviews")]
+    partial class AddSubmissionReviews
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -254,9 +257,6 @@ namespace AcademicRepository.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -268,11 +268,6 @@ namespace AcademicRepository.Migrations
 
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
 
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
@@ -428,9 +423,6 @@ namespace AcademicRepository.Migrations
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("SubmissionVersionId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ProjectSubmissionId")
@@ -439,10 +431,6 @@ namespace AcademicRepository.Migrations
                         .HasFilter("[Decision] = 0");
 
                     b.HasIndex("ReviewerId");
-
-                    b.HasIndex("SubmissionVersionId")
-                        .IsUnique()
-                        .HasFilter("[SubmissionVersionId] IS NOT NULL");
 
                     b.HasIndex("ProjectSubmissionId", "ReviewRound")
                         .IsUnique();
@@ -455,102 +443,6 @@ namespace AcademicRepository.Migrations
 
                             t.HasCheckConstraint("CK_SubmissionReviews_Round", "[ReviewRound] >= 1");
                         });
-                });
-
-            modelBuilder.Entity("AcademicRepository.Models.SubmissionVersion", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AbstractSnapshot")
-                        .IsRequired()
-                        .HasMaxLength(10000)
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("AcademicYearSnapshot")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("CourseCodeSnapshot")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("CourseNameSnapshot")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedByUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<int>("DepartmentIdSnapshot")
-                        .HasColumnType("int");
-
-                    b.Property<string>("KeywordsSnapshot")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<int>("ProjectSubmissionId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProjectTypeSnapshot")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SemesterSnapshot")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime>("SubmittedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SupervisorNameSnapshot")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("TitleSnapshot")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)");
-
-                    b.Property<int>("VersionNumber")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("DepartmentIdSnapshot");
-
-                    b.HasIndex("ProjectSubmissionId", "VersionNumber")
-                        .IsUnique();
-
-                    b.ToTable("SubmissionVersions", t =>
-                        {
-                            t.HasCheckConstraint("CK_SubmissionVersions_Number", "[VersionNumber] >= 1");
-                        });
-                });
-
-            modelBuilder.Entity("AcademicRepository.Models.SubmissionVersionFile", b =>
-                {
-                    b.Property<int>("SubmissionVersionId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProjectFileId")
-                        .HasColumnType("int");
-
-                    b.HasKey("SubmissionVersionId", "ProjectFileId");
-
-                    b.HasIndex("ProjectFileId");
-
-                    b.ToTable("SubmissionVersionFiles");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -756,60 +648,9 @@ namespace AcademicRepository.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("AcademicRepository.Models.SubmissionVersion", "SubmissionVersion")
-                        .WithMany()
-                        .HasForeignKey("SubmissionVersionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("ProjectSubmission");
 
                     b.Navigation("Reviewer");
-
-                    b.Navigation("SubmissionVersion");
-                });
-
-            modelBuilder.Entity("AcademicRepository.Models.SubmissionVersion", b =>
-                {
-                    b.HasOne("AcademicRepository.Models.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("AcademicRepository.Models.Department", "Department")
-                        .WithMany()
-                        .HasForeignKey("DepartmentIdSnapshot")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("AcademicRepository.Models.ProjectSubmission", "ProjectSubmission")
-                        .WithMany()
-                        .HasForeignKey("ProjectSubmissionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Department");
-
-                    b.Navigation("ProjectSubmission");
-                });
-
-            modelBuilder.Entity("AcademicRepository.Models.SubmissionVersionFile", b =>
-                {
-                    b.HasOne("AcademicRepository.Models.ProjectFile", "ProjectFile")
-                        .WithMany()
-                        .HasForeignKey("ProjectFileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("AcademicRepository.Models.SubmissionVersion", "SubmissionVersion")
-                        .WithMany("Files")
-                        .HasForeignKey("SubmissionVersionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ProjectFile");
-
-                    b.Navigation("SubmissionVersion");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -873,11 +714,6 @@ namespace AcademicRepository.Migrations
                     b.Navigation("ProjectFiles");
 
                     b.Navigation("Reviews");
-                });
-
-            modelBuilder.Entity("AcademicRepository.Models.SubmissionVersion", b =>
-                {
-                    b.Navigation("Files");
                 });
 #pragma warning restore 612, 618
         }

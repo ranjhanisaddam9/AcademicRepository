@@ -16,12 +16,14 @@ public enum SubmissionStatus
     Submitted,
     [Display(Name = "Under Review")] UnderReview,
     Approved,
-    Rejected
+    Rejected,
+    Revision
 }
 
 public class ProjectSubmission
 {
     public ICollection<ProjectFile> ProjectFiles { get; set; } = new List<ProjectFile>();
+    public ICollection<SubmissionReview> Reviews { get; set; } = new List<SubmissionReview>();
     public int Id { get; set; }
     public string Title { get; set; } = "";
     public string Abstract { get; set; } = "";

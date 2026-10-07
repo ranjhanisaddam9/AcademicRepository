@@ -1,0 +1,14 @@
+@model CoordinatorDashboardViewModel
+@{ ViewData["Title"] = "Coordinator Dashboard"; }
+<h1>Coordinator Dashboard</h1>
+<p class="lead">Department: @Model.Profile.Department</p>
+<div class="row g-3 mb-4">
+@foreach (var item in new[] { ("Awaiting Review", "awaiting", Model.AwaitingReview), ("Under Review", "underreview", Model.UnderReview), ("Approved", "approved", Model.Approved), ("Rejected", "rejected", Model.Rejected) })
+{
+<div class="col-sm-6 col-lg-3"><div class="card card-body"><span>@item.Item1</span><strong class="fs-3" data-review-count="@item.Item2">@item.Item3</strong></div></div>
+}
+</div>
+<a class="btn btn-primary" asp-action="ReviewQueue">Review Queue</a>
+<a class="btn btn-outline-primary" asp-action="Submissions">All Submissions</a>
+<h2 class="h4 mt-4">Recent Submissions</h2>
+<partial name="_ReviewQueueTable" model="Model.Recent" />

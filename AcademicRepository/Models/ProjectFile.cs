@@ -15,6 +15,8 @@ public enum ProjectResourceType
 
 public sealed class ProjectFile
 {
+    public bool IsActive { get; set; } = true;
+    public DateTime? DeletedAt { get; set; }
     public int Id { get; set; }
     public int ProjectSubmissionId { get; set; }
     public ProjectSubmission ProjectSubmission { get; set; } = null!;

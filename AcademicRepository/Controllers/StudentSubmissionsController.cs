@@ -13,7 +13,7 @@ namespace AcademicRepository.Controllers;
 [Route("Student/Submissions")]
 public class StudentSubmissionsController(ApplicationDbContext db, UserManager<ApplicationUser> users,
     StudentSubmissionService submissions, IDataProtectionProvider protection, ILogger<StudentSubmissionsController> logger,
-    StudentDepartmentService departments, SubmissionLock submissionLock) : Controller
+    StudentDepartmentService departments, SubmissionLock submissionLock, SubmissionWorkflowService workflow) : Controller
 {
     private readonly IDataProtector editProtector = protection.CreateProtector("AcademicRepository.SubmissionEdits.v1");
     private string StudentId => users.GetUserId(User) ?? "";
@@ -45,7 +45,6 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
             CreatedAt = now
         };
         ApplyFields(submission, model);
-        SetSubmitted(submission, intent, now);
         db.ProjectSubmissions.Add(submission);
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException exception)
@@ -65,7 +64,9 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
                 s.Student.FullName == "" ? s.Student.UserName ?? "Student" : s.Student.FullName, s.Department.Name,
                 s.Abstract, s.Keywords, s.SupervisorName, s.CourseName, s.CourseCode, s.AcademicYear, s.Semester,
                 s.CreatedAt, s.UpdatedAt, s.SubmittedAt)).SingleOrDefaultAsync();
-        return model is null ? NotFound() : View(model);
+        if (model is null) return NotFound();
+        if (model.Status == SubmissionStatus.Rejected) ViewData["CanStartRevision"] = await workflow.CanStartRevisionAsync(StudentId, id);
+        return View(model);
     }
 
     [HttpGet("{id:int}/Edit")]
@@ -73,9 +74,11 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     {
         var submission = await FindOwnedAsync(id);
         if (submission is null) return NotFound();
-        if (submission.Status != SubmissionStatus.Draft) return Locked();
+        if (!SubmissionWorkflow.CanEdit(submission.Status)) return Locked();
         var student = await users.GetUserAsync(User);
         if (!await CanCreateAsync(student)) return Unavailable();
+        if (submission.Status == SubmissionStatus.Revision && submission.DepartmentId != student!.DepartmentId) return NotFound();
+        ViewData["Revision"] = submission.Status == SubmissionStatus.Revision;
         return View(new EditSubmissionViewModel
         {
             DepartmentName = await DepartmentNameAsync(student!), Title = submission.Title, Abstract = submission.Abstract, Keywords = submission.Keywords,
@@ -91,20 +94,32 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
         await using var transaction = await db.Database.BeginTransactionAsync();
         var submission = await submissionLock.OwnedAsync(id, StudentId);
         if (submission is null) return NotFound();
-        if (submission.Status != SubmissionStatus.Draft) return Locked();
+        if (!SubmissionWorkflow.CanEdit(submission.Status)) return Locked();
         if (!ValidToken(model.EditToken, submission)) return Changed();
         var student = await users.GetUserAsync(User);
         if (!await CanCreateAsync(student)) return Unavailable();
+        if (submission.Status == SubmissionStatus.Revision && submission.DepartmentId != student!.DepartmentId) return NotFound();
+        var revision = submission.Status == SubmissionStatus.Revision;
+        ViewData["Revision"] = revision;
+        if (revision)
+        {
+            if (model.ProjectType != submission.ProjectType) ModelState.AddModelError(nameof(model.ProjectType), "Project type cannot change after the first submission.");
+            model.ProjectType = submission.ProjectType;
+        }
         model.DepartmentName = await DepartmentNameAsync(student!);
         ValidateSubmission(model, intent);
-        if (intent == "Submit" && !await db.ProjectFiles.AnyAsync(f => f.ProjectSubmissionId == id))
+        if (intent == "Submit" && !await db.ProjectFiles.AnyAsync(f => f.ProjectSubmissionId == id && f.IsActive))
             ModelState.AddModelError("", "Please upload at least one resource file before submitting your project.");
         if (!ModelState.IsValid) return View(model);
         var now = DateTime.UtcNow;
         ApplyFields(submission, model);
         submission.DepartmentId = student!.DepartmentId!.Value;
         submission.UpdatedAt = now;
-        SetSubmitted(submission, intent, now);
+        if (intent == "Submit")
+        {
+            try { await workflow.SubmitAsync(StudentId, submission); }
+            catch (ReviewOperationException ex) { ModelState.AddModelError("", ex.Message); Response.StatusCode = ex.Status; return View(model); }
+        }
         try { await db.SaveChangesAsync(); await transaction.CommitAsync(); }
         catch (DbUpdateConcurrencyException) { return Changed(); }
         catch (DbUpdateException exception)
@@ -143,6 +158,15 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     }
 
     private Task<ProjectSubmission?> FindOwnedAsync(int id) => submissions.OwnedBy(StudentId).SingleOrDefaultAsync(s => s.Id == id);
+    [HttpPost("{id:int}/StartRevision")]
+    public async Task<IActionResult> StartRevision([FromRoute] int id)
+    {
+        try { await workflow.StartRevisionAsync(StudentId, id); }
+        catch (ReviewOperationException ex) { Response.StatusCode = ex.Status; return View("Message", ex.Message); }
+        catch (System.Data.Common.DbException) { Response.StatusCode = 503; return View("Message", "Submission services are temporarily unavailable."); }
+        TempData["Status"] = "Revision started. Previous submitted versions and reviews are preserved.";
+        return RedirectToAction(nameof(Edit), new { id });
+    }
     private async Task<bool> CanCreateAsync(ApplicationUser? student) => student is { IsActive: true, DepartmentId: not null }
         && await departments.MatchesAsync(student);
     private async Task<string> DepartmentNameAsync(ApplicationUser student) => await db.Departments.Where(d => d.Id == student.DepartmentId).Select(d => d.Name).SingleAsync();
@@ -151,7 +175,7 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
         Response.StatusCode = StatusCodes.Status403Forbidden;
         return View("Message", "An active student account with an assigned department is required to create submissions. Contact your administrator.");
     }
-    private IActionResult Locked() => ConflictView("This submission is no longer a draft. It cannot be edited or deleted.");
+    private IActionResult Locked() => ConflictView("Only Draft or Revision submissions can be edited; only initial drafts can be deleted.");
     private IActionResult Changed() => ConflictView("This draft changed or was deleted while the page was open. Return to My Submissions and reload before continuing.");
     private IActionResult ConflictView(string message)
     {
@@ -162,7 +186,7 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     private IActionResult Saved(ProjectSubmission submission)
     {
         TempData["Status"] = submission.Status == SubmissionStatus.Submitted
-            ? "Your submission has been submitted successfully." : "Draft saved.";
+            ? "Your submission has been submitted successfully." : submission.Status == SubmissionStatus.Revision ? "Revision saved." : "Draft saved.";
         return RedirectToAction(nameof(Details), new { id = submission.Id });
     }
 
@@ -193,13 +217,6 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
         submission.Semester = Optional(model.Semester);
     }
     private static string? Optional(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
-    private static void SetSubmitted(ProjectSubmission submission, string? intent, DateTime now)
-    {
-        if (intent != "Submit") return;
-        submission.Status = SubmissionStatus.Submitted;
-        submission.SubmittedAt = now;
-        submission.UpdatedAt = now;
-    }
     private static string TokenValue(ProjectSubmission submission) => $"{submission.StudentId}\n{submission.Id}\n{Convert.ToBase64String(submission.RowVersion)}";
     private string Token(ProjectSubmission submission) => editProtector.Protect(TokenValue(submission));
     private bool ValidToken(string? token, ProjectSubmission submission)

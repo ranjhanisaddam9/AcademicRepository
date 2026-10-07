@@ -28,14 +28,14 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
     }
     private static void RequireDraft(ProjectSubmission submission)
     {
-        if (submission.Status != SubmissionStatus.Draft) throw new ResourceOperationException(409, "Resources cannot be changed after submission.");
+        if (!SubmissionWorkflow.CanEdit(submission.Status)) throw new ResourceOperationException(409, "Resources can only be changed in Draft or Revision.");
     }
     public async Task<ResourceListViewModel> ListAsync(int submissionId, string studentId)
     {
         var submission = await AuthorizedAsync(submissionId, studentId);
-        var files = await db.ProjectFiles.Where(f => f.ProjectSubmissionId == submissionId).OrderBy(f => f.UploadedAt).ThenBy(f => f.Id)
+        var files = await db.ProjectFiles.Where(f => f.ProjectSubmissionId == submissionId && f.IsActive).OrderBy(f => f.UploadedAt).ThenBy(f => f.Id)
             .Select(f => new ProjectFileViewModel(f.Id, f.OriginalFileName, f.ResourceType, f.Description, f.FileSize, f.UploadedAt)).ToListAsync();
-        return new(submissionId, submission.Status == SubmissionStatus.Draft, files, Settings.MaxFileSizeMB, Settings.MaxFilesPerSubmission);
+        return new(submissionId, SubmissionWorkflow.CanEdit(submission.Status), files, Settings.MaxFileSizeMB, Settings.MaxFilesPerSubmission);
     }
     public async Task UploadAsync(int submissionId, string studentId, UploadResourceViewModel model)
     {
@@ -52,7 +52,7 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
         await using var transaction = await db.Database.BeginTransactionAsync();
         var submission = await AuthorizedAsync(submissionId, studentId, locked: true);
         RequireDraft(submission);
-        if (await db.ProjectFiles.CountAsync(f => f.ProjectSubmissionId == submissionId) >= Settings.MaxFilesPerSubmission)
+        if (await db.ProjectFiles.CountAsync(f => f.ProjectSubmissionId == submissionId && f.IsActive) >= Settings.MaxFilesPerSubmission)
             throw new ResourceOperationException(400, $"A submission can contain at most {Settings.MaxFilesPerSubmission} files.");
         string? key = null;
         var commitStarted = false;
@@ -102,6 +102,7 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
     public async Task<(Stream Stream, string Name, string ContentType)> DownloadAsync(int id, string studentId)
     {
         var file = await FileAsync(id, studentId);
+        if (!file.IsActive && !await db.SubmissionVersionFiles.AnyAsync(v => v.ProjectFileId == id)) throw new ResourceOperationException(404, "Resource not found.");
         try { return (await storage.OpenReadAsync(file.StoredFileName), file.OriginalFileName, file.ContentType); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -119,9 +120,12 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
         var submission = await AuthorizedAsync(parentId.Value, studentId, true);
         RequireDraft(submission);
         var file = await FileAsync(id, studentId);
+        if (!file.IsActive) throw new ResourceOperationException(409, "This resource has already been removed from the current submission.");
+        var historical = await db.SubmissionVersionFiles.AnyAsync(v => v.ProjectFileId == id);
         try
         {
-            db.ProjectFiles.Remove(file);
+            if (historical) { file.IsActive = false; file.DeletedAt = DateTime.UtcNow; }
+            else db.ProjectFiles.Remove(file);
             submission.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -131,6 +135,7 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
             logger.LogError("Resource record deletion failed for {FileId} ({ErrorType}).", id, ex.GetType().Name);
             throw new ResourceOperationException(503, "Unable to delete the resource. Please try again.");
         }
+        if (historical) return parentId.Value;
         // DB-first removal never leaves a downloadable record pointing at deleted bytes.
         // A cleanup failure is an inaccessible orphan; key is logged for reconciliation.
         try { await storage.DeleteAsync(file.StoredFileName); }

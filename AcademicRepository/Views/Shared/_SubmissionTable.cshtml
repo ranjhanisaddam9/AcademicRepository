@@ -3,7 +3,8 @@
 @foreach (var submission in Model)
 {
     <tr><td>@submission.Title</td><td>@Html.DisplayFor(_ => submission.ProjectType)</td><td>@submission.Department</td><td>@submission.CreatedAt.ToString("u")</td><td>@(submission.SubmittedAt?.ToString("u") ?? "Not submitted")</td><td><partial name="_SubmissionStatus" model="submission.Status" /></td><td>
-    <a asp-controller="StudentSubmissions" asp-action="Details" asp-route-id="@submission.Id">View</a>
+    <a asp-controller="StudentSubmissions" asp-action="Details" asp-route-id="@submission.Id">@(submission.Status == SubmissionStatus.Rejected ? "View Feedback / Start Revision" : "View")</a>
+    @if (submission.Status == SubmissionStatus.Revision) { <span> | </span><a asp-controller="StudentSubmissions" asp-action="Edit" asp-route-id="@submission.Id">Edit / Manage Resources / Resubmit</a> }
     @if (submission.Status == SubmissionStatus.Draft)
     {
         <span> | </span><a asp-controller="StudentSubmissions" asp-action="Edit" asp-route-id="@submission.Id">Edit</a>

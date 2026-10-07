@@ -21,6 +21,6 @@ public sealed class StudentSubmissionService(ApplicationDbContext db)
         var counts = await OwnedBy(studentId).GroupBy(s => s.Status).Select(g => new { Status = g.Key, Count = g.Count() }).ToListAsync();
         int Count(SubmissionStatus status) => counts.SingleOrDefault(c => c.Status == status)?.Count ?? 0;
         return new StudentDashboardViewModel(profile, counts.Sum(c => c.Count), Count(SubmissionStatus.Draft), Count(SubmissionStatus.Submitted),
-            Count(SubmissionStatus.Approved), Count(SubmissionStatus.Rejected), await ListAsync(studentId, 5));
+            Count(SubmissionStatus.Approved), Count(SubmissionStatus.Rejected), await ListAsync(studentId, 5), Count(SubmissionStatus.Revision));
     }
 }

@@ -1,0 +1,8 @@
+@model VersionHistoryViewModel
+<section class="mt-4"><h2>Submitted Versions</h2>
+@if (Model.Versions.Count == 0) { <p>No submitted version snapshot is recorded.</p> }
+@foreach (var version in Model.Versions)
+{
+<p><a asp-controller="SubmissionVersions" asp-action="Details" asp-route-id="@version.Id">Version @version.VersionNumber — @version.Title</a> · Submitted (UTC): @version.SubmittedAt.ToString("u")</p>
+}
+</section>

@@ -25,6 +25,10 @@
             }
             else if (role != "ORICQEC")
             {
+                if (role == "Coordinator")
+                {
+                    <a class="text-white" asp-controller="Coordinator" asp-action="ReviewQueue">Review Queue</a>
+                }
                 <a class="text-white" asp-controller="@role" asp-action="@action">@label</a>
                 if (role == "Student")
                 {
