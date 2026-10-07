@@ -5,10 +5,11 @@ namespace AcademicRepository.Data;
 
 public static class IdentitySeeder
 {
-    public static readonly string[] Roles = ["Admin", "Student", "Coordinator", "DepartmentHead"];
+    public static readonly string[] Roles = ["Admin", "Student", "Coordinator", "DepartmentHead", "ORICQEC"];
 
     public static async Task SeedAsync(IServiceProvider services, IConfiguration configuration, bool development)
     {
+        await DepartmentSeeder.SeedAsync(services.GetRequiredService<ApplicationDbContext>());
         var roles = services.GetRequiredService<RoleManager<IdentityRole>>();
         foreach (var role in Roles)
             if (!await roles.RoleExistsAsync(role))
@@ -22,6 +23,8 @@ public static class IdentitySeeder
             throw new InvalidOperationException("Configure both DevelopmentAdmin:Email and DevelopmentAdmin:Password using user secrets.");
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await users.FindByEmailAsync(email);
+        // Preserve legacy development accounts; they must be corrected manually before signing in.
+        if (user is not null && !Services.InstitutionalEmail.IsValid(email)) return;
         if (user is null)
         {
             user = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true, FullName = "Development Administrator" };

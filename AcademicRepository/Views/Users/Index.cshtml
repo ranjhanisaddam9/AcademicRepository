@@ -5,7 +5,8 @@
 @foreach (var user in Model)
 {
     <tr><td>@user.FullName</td><td>@user.Email</td><td>@user.Role</td><td>@user.Department</td><td>@(user.IsActive ? "Active" : "Inactive")</td><td>
-        <a asp-action="Edit" asp-route-id="@user.Id">Edit</a> | <a asp-action="ResetPassword" asp-route-id="@user.Id">Reset Password</a>
+        <a asp-action="Edit" asp-route-id="@user.Id">Edit</a>
+        @if (user.Role != "Student") { <span> | </span><a asp-action="ResetPassword" asp-route-id="@user.Id">Reset Password</a> }
         <form class="d-inline ms-2" asp-action="SetActive" asp-route-id="@user.Id" method="post"><input type="hidden" name="isActive" value="@((!user.IsActive).ToString())" /><button class="btn btn-sm btn-outline-secondary">@(user.IsActive ? "Deactivate" : "Activate")</button></form>
     </td></tr>
 }

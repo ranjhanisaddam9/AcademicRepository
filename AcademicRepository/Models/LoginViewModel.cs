@@ -4,7 +4,7 @@ namespace AcademicRepository.Models;
 
 public sealed class LoginViewModel
 {
-    [Required, EmailAddress]
+    [Required, EmailAddress, Services.InstitutionalEmailAttribute]
     public string Email { get; set; } = "";
     [Required, DataType(DataType.Password)]
     public string Password { get; set; } = "";

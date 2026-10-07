@@ -1,0 +1,6 @@
+@model SubmissionStatus
+@{
+    var css = Model switch { SubmissionStatus.Draft => "bg-secondary", SubmissionStatus.Submitted => "bg-primary", SubmissionStatus.Approved => "bg-success", SubmissionStatus.Rejected => "bg-danger", _ => "bg-warning text-dark" };
+    var label = Model == SubmissionStatus.UnderReview ? "Under Review" : Model.ToString();
+}
+<span class="badge @css">@label</span>

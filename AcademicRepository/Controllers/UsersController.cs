@@ -6,11 +6,13 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using AcademicRepository.Services;
 
 namespace AcademicRepository.Controllers;
 
 [Authorize(Roles = "Admin")]
-public class UsersController(ApplicationDbContext db, UserManager<ApplicationUser> users, IDataProtectionProvider protection, ILogger<UsersController> logger) : Controller
+public class UsersController(ApplicationDbContext db, UserManager<ApplicationUser> users, IDataProtectionProvider protection, ILogger<UsersController> logger,
+    StudentDepartmentService studentDepartments) : Controller
 {
     private readonly IDataProtector editProtector = protection.CreateProtector("AcademicRepository.UserEdits.v1");
     public async Task<IActionResult> Index(int? departmentId = null)
@@ -36,17 +38,19 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
     [HttpPost]
     public async Task<IActionResult> Create(UserFormViewModel model)
     {
+        if (model.Role == "Student") ModelState.AddModelError(nameof(model.Role), "Students register by verifying their own email code. Admins create staff accounts only.");
         await ValidateAsync(model);
-        if (string.IsNullOrWhiteSpace(model.TemporaryPassword)) ModelState.AddModelError(nameof(model.TemporaryPassword), "Temporary password is required.");
+        if (model.Role != "Student" && string.IsNullOrWhiteSpace(model.TemporaryPassword)) ModelState.AddModelError(nameof(model.TemporaryPassword), "Temporary password is required for staff.");
         if (!ModelState.IsValid) return await FormAsync(model);
         await using var transaction = await db.Database.BeginTransactionAsync();
         try
         {
             var user = new ApplicationUser { FullName = model.FullName, UserName = model.Email, Email = model.Email, DepartmentId = model.DepartmentId };
-            if (!Accept(await users.CreateAsync(user, model.TemporaryPassword!))) return await FormAsync(model);
+            var created = model.Role == "Student" ? await users.CreateAsync(user) : await users.CreateAsync(user, model.TemporaryPassword!);
+            if (!Accept(created)) return await FormAsync(model);
             if (!Accept(await users.AddToRoleAsync(user, model.Role))) return await FormAsync(model);
             await transaction.CommitAsync();
-            TempData["Status"] = "User created. Share the temporary password securely with the user.";
+            TempData["Status"] = model.Role == "Student" ? "Student created. They sign in using an emailed verification code." : "User created. Share the temporary password securely with the user.";
             return RedirectToAction(nameof(Index));
         }
         catch (DbUpdateException exception)
@@ -77,6 +81,11 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
         var user = await users.FindByIdAsync(id);
         if (user is null) return NotFound();
         await ValidateAsync(model, user);
+        var previousRoles = await users.GetRolesAsync(user);
+        if (model.Role == "Student" && !previousRoles.Contains("Student"))
+            ModelState.AddModelError(nameof(model.Role), "Students register by verifying their own email code. A staff account cannot be changed to Student.");
+        if (model.Role != "Student" && (previousRoles.Contains("Student") || !await users.HasPasswordAsync(user)) && string.IsNullOrWhiteSpace(model.TemporaryPassword))
+            ModelState.AddModelError(nameof(model.TemporaryPassword), "Set a temporary password when changing a passwordless Student to staff.");
         if (user.Id == users.GetUserId(User) && model.Role != "Admin")
             ModelState.AddModelError(nameof(model.Role), "You cannot remove your own Admin role.");
         if (!ValidEditToken(model.EditToken, user))
@@ -87,12 +96,18 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
         {
             user.FullName = model.FullName;
             user.Email = model.Email;
+            if (model.Role == "Student") user.StudentNumber = StudentDepartmentService.StudentNumberFromEmail(model.Email);
             user.UserName = model.Email;
             user.DepartmentId = model.DepartmentId;
             if (!Accept(await users.UpdateAsync(user))) return await FormAsync(model, user.DepartmentId);
             var oldRoles = (await users.GetRolesAsync(user)).Where(r => IdentitySeeder.Roles.Contains(r)).ToArray();
             if (oldRoles.Length > 0 && !Accept(await users.RemoveFromRolesAsync(user, oldRoles))) return await FormAsync(model, user.DepartmentId);
             if (!Accept(await users.AddToRoleAsync(user, model.Role))) return await FormAsync(model, user.DepartmentId);
+            if (model.Role != "Student" && !string.IsNullOrWhiteSpace(model.TemporaryPassword))
+            {
+                var resetToken = await users.GeneratePasswordResetTokenAsync(user);
+                if (!Accept(await users.ResetPasswordAsync(user, resetToken, model.TemporaryPassword))) return await FormAsync(model, user.DepartmentId);
+            }
             // End existing sessions so role changes take effect immediately.
             if (!Accept(await users.UpdateSecurityStampAsync(user))) return await FormAsync(model, user.DepartmentId);
             await transaction.CommitAsync();
@@ -135,7 +150,9 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
     public async Task<IActionResult> ResetPassword(string id)
     {
         var user = await users.FindByIdAsync(id);
-        return user is null ? NotFound() : View(new ResetPasswordViewModel { UserName = user.FullName });
+        if (user is null) return NotFound();
+        if (await users.IsInRoleAsync(user, "Student")) return BadRequest("Students use passwordless sign-in codes.");
+        return View(new ResetPasswordViewModel { UserName = user.FullName });
     }
 
     [HttpPost]
@@ -143,6 +160,7 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
     {
         var user = await users.FindByIdAsync(id);
         if (user is null) return NotFound();
+        if (await users.IsInRoleAsync(user, "Student")) return BadRequest("Students use passwordless sign-in codes.");
         model.UserName = user.FullName;
         if (ModelState.IsValid)
         {
@@ -163,8 +181,17 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
         model.FullName = (model.FullName ?? "").Trim();
         model.Email = (model.Email ?? "").Trim();
         if (model.FullName.Length == 0) ModelState.AddModelError(nameof(model.FullName), "Full name is required.");
-        if (!IdentitySeeder.Roles.Contains(model.Role)) ModelState.AddModelError(nameof(model.Role), "Select one of the four application roles.");
-        if (model.Role != "Admin" && model.DepartmentId is null) ModelState.AddModelError(nameof(model.DepartmentId), "A department is required for this role.");
+        if (!InstitutionalEmail.IsValid(model.Email)) ModelState.AddModelError(nameof(model.Email), "Use a valid @smiu.edu.pk email address.");
+        if (!IdentitySeeder.Roles.Contains(model.Role)) ModelState.AddModelError(nameof(model.Role), "Select a valid application role.");
+        if (model.Role == "Student")
+        {
+            // Student department is always derived from the email; discard all browser values/errors.
+            ModelState.Remove(nameof(model.DepartmentId));
+            var mapped = await studentDepartments.ResolveAsync(model.Email);
+            model.DepartmentId = mapped?.Id;
+            if (mapped is null) ModelState.AddModelError(nameof(model.Email), "Use a Student email such as CSC20F005@smiu.edu.pk: department letters, two-digit year, F or S session, and three digits.");
+        }
+        if (ApplicationRoles.RequiresDepartment(model.Role) && model.DepartmentId is null) ModelState.AddModelError(nameof(model.DepartmentId), "A department is required for this role.");
         if (model.DepartmentId is int departmentId)
         {
             var department = await db.Departments.FindAsync(departmentId);

@@ -1,0 +1,16 @@
+@model StudentDashboardViewModel
+@{ ViewData["Title"] = "Student Dashboard"; }
+<h1>Academic Project Repository</h1>
+<p>Welcome, @Model.Profile.FullName</p>
+<p>Role: @string.Join(", ", Model.Profile.Roles)</p>
+<p>Department: @Model.Profile.Department</p>
+<div class="row g-3 mb-4">
+<div class="col"><div class="card card-body"><span>My Submissions</span><strong data-summary="total">@Model.Total</strong></div></div>
+<div class="col"><div class="card card-body"><span>Drafts</span><strong data-summary="drafts">@Model.Drafts</strong></div></div>
+<div class="col"><div class="card card-body"><span>Submitted</span><strong data-summary="submitted">@Model.Submitted</strong></div></div>
+<div class="col"><div class="card card-body"><span>Approved</span><strong data-summary="approved">@Model.Approved</strong></div></div>
+<div class="col"><div class="card card-body"><span>Rejected</span><strong data-summary="rejected">@Model.Rejected</strong></div></div>
+</div>
+<a class="btn btn-primary mb-4" asp-controller="StudentSubmissions" asp-action="Create">New Submission</a>
+<h2>My Recent Submissions</h2>
+<partial name="_SubmissionTable" model="Model.Recent" />

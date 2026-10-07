@@ -19,7 +19,7 @@ public sealed class UserFormViewModel
 {
     [Required, StringLength(150), Display(Name = "Full Name")]
     public string FullName { get; set; } = "";
-    [Required, EmailAddress, StringLength(256)]
+    [Required, EmailAddress, Services.InstitutionalEmailAttribute, StringLength(256)]
     public string Email { get; set; } = "";
     [Required]
     public string Role { get; set; } = "";

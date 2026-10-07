@@ -1,0 +1,9 @@
+@model CreateSubmissionViewModel
+@{ ViewData["Title"] = "New Submission"; }
+<h1>New Submission</h1>
+<form asp-action="Create" method="post" style="max-width:850px">
+<partial name="_Fields" model="Model" />
+<button class="btn btn-secondary" name="intent" value="SaveDraft" type="submit">Save Draft</button>
+<p class="mt-2">Save a draft, then upload at least one resource before submitting.</p>
+<a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+</form>

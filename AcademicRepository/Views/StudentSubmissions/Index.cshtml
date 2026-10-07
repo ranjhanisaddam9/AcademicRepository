@@ -1,0 +1,4 @@
+@model IReadOnlyList<SubmissionListViewModel>
+@{ ViewData["Title"] = "My Submissions"; }
+<div class="d-flex justify-content-between align-items-center mb-3"><h1>My Submissions</h1><a class="btn btn-primary" asp-action="Create">New Submission</a></div>
+<partial name="_SubmissionTable" model="Model" />

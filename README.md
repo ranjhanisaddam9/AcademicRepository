@@ -1,10 +1,16 @@
-# AcademicRepository — Milestones 1 and 2
+# AcademicRepository — Milestones 1, 2, 3, 3.5 and 4
 
-ASP.NET Core MVC, .NET 10, EF Core SQL Server, Identity, Razor and local Bootstrap 5.3.8. Foundation/authentication and Admin department/user management are implemented. Git is initialized; no commit was created.
+Milestone 4 adds private academic resource uploads to existing Student submissions. See [MILESTONE4.md](MILESTONE4.md) for verification, storage settings, migration, tests and deployment notes. Save a draft, add resources on Details/Edit, then submit. Newly submitted drafts require at least one resource; submitted packages are read-only. Existing submitted records without files are preserved.
 
-See [MILESTONE2.md](MILESTONE2.md) for the latest migration, verification results, design decisions, complete changed-file inventory and manual checklist. The sections below retain the original Milestone 1 setup details.
+ASP.NET Core MVC, .NET 10, EF Core SQL Server, Identity, Razor and local Bootstrap 5.3.8. Foundation/authentication, Admin department/user management, Student draft/submission workflows, institutional authentication and ORIC/QEC role expansion are implemented. See the milestone reports for the current working-tree changes.
+
+See [MILESTONE3.5-VERIFICATION.md](MILESTONE3.5-VERIFICATION.md) for the current verification results, migrations, changed files and remaining legacy-account correction. [MILESTONE3.5.md](MILESTONE3.5.md), [MILESTONE3.md](MILESTONE3.md) and [MILESTONE2.md](MILESTONE2.md) document the milestone implementations. The sections below retain the original Milestone 1 setup details.
 
 ## Setup
+
+For local Student email testing, `Email:DevelopmentStudentRecipient` can redirect Student OTPs to a test mailbox without changing the Student account email or department. It is currently configured in local user secrets as `ranjhanisaddam@smiu.edu.pk`. Staff recovery is unaffected; the override is forbidden outside Development. See [OFFICE365.md](OFFICE365.md) for setup and removal commands.
+
+Student email format: `CSC20F005@smiu.edu.pk`. The leading letters map to the department; `20` is the two-digit year, `F` is Fall (`S` is Spring), and `005` is the three-digit sequence. Validation is case-insensitive. The stored StudentNumber inserts separators: `CSC20F005` becomes `CSC-20F-005`; email addresses stay compact. Existing mappings remain BUS, CSC, BSE, ENG, ENV, BDS, BAI and BIT. Apply `BackfillPrefixStudentNumbers` and `FormatStudentNumbers` along with all prior migrations. Admins do not register Students; accounts are created only after email OTP verification.
 
 Open `AcademicRepository.slnx` in a .NET 10 compatible Visual Studio, or this directory in VS Code. Install the .NET 10 SDK. A workspace-local SDK was installed at `H:\AI\.dotnet` for verification; it is outside this repository. For this machine's PowerShell session:
 
@@ -19,7 +25,7 @@ dotnet restore
 
 ```powershell
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=.\SQLEXPRESS;Database=AcademicRepository;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True" --project AcademicRepository
-dotnet user-secrets set "DevelopmentAdmin:Email" "your-admin-email@example.com" --project AcademicRepository
+dotnet user-secrets set "DevelopmentAdmin:Email" "your-admin@smiu.edu.pk" --project AcademicRepository
 dotnet user-secrets set "DevelopmentAdmin:Password" "<your unique development password>" --project AcademicRepository
 ```
 
@@ -36,7 +42,7 @@ dotnet build AcademicRepository.slnx
 dotnet run --project AcademicRepository
 ```
 
-For future approved schema changes, generate a migration with `dotnet ef migrations add <Name> --project AcademicRepository`. To inspect deployable SQL: `dotnet ef migrations script --idempotent --project AcademicRepository`. Migrations are applied explicitly, not automatically at application startup. Missing schema/connection failures are logged and stop startup. Production runtime database permissions can therefore be narrower than migration permissions.
+The additive `AddOtpAuthenticationAndOricQec` migration adds only the `AuthenticationCodes` table. To update an existing database, run `dotnet ef database update --project AcademicRepository`. To inspect deployable SQL: `dotnet ef migrations script --idempotent --project AcademicRepository`. Migrations are applied explicitly, not automatically at application startup. Missing schema/connection failures are logged and stop startup. Production runtime database permissions can therefore be narrower than migration permissions.
 
 Trust the local HTTPS development certificate if necessary with `dotnet dev-certs https --trust`. Browse `https://localhost:7145`. Login is `/Account/Login`; logout is an antiforgery-protected POST. Public registration has no endpoint. Home `/` and all role dashboards require authentication. An unauthorized role redirects to `/Account/AccessDenied`, which returns HTTP 403. Admin has no implicit access to other roles. Users with multiple assigned roles can access each assigned role's pages, following standard Identity role behavior.
 
@@ -46,19 +52,19 @@ Trust the local HTTPS development certificate if necessary with `dotnet dev-cert
 dotnet run --project AcademicRepository.Tests
 ```
 
-This executable integration harness uses real SQL Server Express and a uniquely named `AcademicRepository_Test_<guid>` database. It applies the checked-in migration, creates ephemeral random-password users, exercises MVC cookies and antiforgery, and deletes its own test database in `finally`. It does not create test users in the application database. It requires permission to create/delete test databases. It verifies role seeding is idempotent, development Admin login, all 16 role dashboard access combinations, role-specific navigation, home content, anonymous redirects, 403 Access Denied, disabled registration, logout/session removal, CSRF protection, POST-only logout and safe login return URLs.
+This executable integration harness uses real SQL Server Express and a uniquely named `AcademicRepository_Test_<guid>` database. It applies all migrations, creates ephemeral test identities, exercises MVC flows and antiforgery, and deletes only that uniquely named test database in `finally`. It covers Milestone 1–3.5 preservation/regression, roles/navigation, submissions/ownership/department isolation, OTP and recovery, institutional email and passwordless Students. It requires permission to create/delete test databases.
 
-Verified on this machine: solution build with zero warnings/errors; migration applied to SQL Server Express; Identity tables created; integration checks passed. The production database uses the configured connection; developer Admin credentials remain for you to configure. Future-feature links render placeholders only.
+Verified on this machine: solution build with zero warnings/errors; all SQL Server integration checks passed; and the additive migration was applied to the configured local database. Configure a stable development Admin account through user secrets as described above. Microsoft 365 email setup is documented in [OFFICE365.md](OFFICE365.md); OTP signing-key setup is in [MILESTONE3.5.md](MILESTONE3.5.md).
 
 ## Manual acceptance checklist
 
 1. Configure SQL connection and development Admin secrets, apply migrations and start using the Development profile.
-2. Confirm `AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, `AspNetUserClaims`, `AspNetRoleClaims`, `AspNetUserLogins`, `AspNetUserTokens` and migration history exist. Confirm the four roles.
+2. Confirm `AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, `AspNetUserClaims`, `AspNetRoleClaims`, `AspNetUserLogins`, `AspNetUserTokens`, `AuthenticationCodes` and migration history exist. Confirm the five roles.
 3. Visit `/` and each role dashboard anonymously; confirm redirects to Login.
 4. Login as the seeded Admin; confirm title, welcome, role and Admin navigation. Visit `/Admin/Dashboard`; visit the other three dashboards and confirm Access Denied.
 5. Create departments and users through the Admin Departments and Users pages, or run the integration harness for isolated fixtures. Verify each role sees only its links and can access only its own dashboard.
 6. Logout, revisit a protected route, and confirm login is required. Verify `/Account/Register` is unavailable.
-7. Restart with the same secrets and confirm no duplicate roles/users. Open future-feature links and confirm placeholders only.
+7. Restart with the same secrets and confirm no duplicate roles/users. Student links now open the submission workflow; Coordinator and DepartmentHead future-feature links remain placeholders.
 
 ## Files created
 
@@ -74,4 +80,4 @@ All source files in this repository are new:
 - `wwwroot/lib/bootstrap/bootstrap.min.css` (vendored Bootstrap with upstream license notice).
 - `AcademicRepository.Tests/AcademicRepository.Tests.csproj`, `AcademicRepository.Tests/Program.cs`.
 
-Application subpaths above are relative to `AcademicRepository/`; this inventory describes the original Milestone 1 files. Build output and check logs are ignored by Git. The Milestone 2 report lists subsequent additions and modifications. No submissions, reviews or repository search were implemented.
+Application subpaths above are relative to `AcademicRepository/`; this inventory describes the original Milestone 1 files. Build output and check logs are ignored by Git. The Milestone 2/3 reports list subsequent additions and modifications. No file uploads, reviews or repository search were implemented.

@@ -23,9 +23,13 @@
                 <a class="text-white" asp-controller="Departments" asp-action="Index">Departments</a>
                 <a class="text-white" asp-controller="Users" asp-action="Index">Users</a>
             }
-            else
+            else if (role != "ORICQEC")
             {
                 <a class="text-white" asp-controller="@role" asp-action="@action">@label</a>
+                if (role == "Student")
+                {
+                    <a class="text-white" asp-controller="StudentSubmissions" asp-action="Create">New Submission</a>
+                }
             }
         }
     }

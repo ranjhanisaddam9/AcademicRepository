@@ -5,3 +5,5 @@
 TestResults/
 *.user
 *.log
+# Private academic resources must never be committed.
+**/App_Data/ProjectFiles/

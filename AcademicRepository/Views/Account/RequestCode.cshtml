@@ -1,0 +1,10 @@
+@model RequestCodeViewModel
+@{ var recovery = ViewContext.RouteData.Values["action"]?.ToString() == "ForgotPassword"; ViewData["Title"] = recovery ? "Staff Password Recovery" : "Student Sign In"; }
+<div class="mx-auto" style="max-width:500px"><h1>@ViewData["Title"]</h1>
+<p>@(recovery ? "Staff only. Students always use Student Sign In." : "Students sign in with an emailed verification code every time. No password is required.")</p>
+@if (!recovery) { <p>Use your Student email, for example <strong>CSC20F005@@smiu.edu.pk</strong>: department letters, two-digit year, F (Fall) or S (Spring), and three digits. After your first successful verification, your account is created in the department identified by the leading letters.</p> }
+<form method="post" asp-action="@(recovery ? "ForgotPassword" : "StudentSignIn")">
+<div asp-validation-summary="All" class="text-danger" role="alert"></div>
+<div class="mb-3"><label asp-for="Email" class="form-label">SMIU Email</label><input asp-for="Email" class="form-control" autocomplete="email" /></div>
+<button class="btn btn-primary">Send Verification Code</button> <a asp-action="Login">Back to Sign In</a>
+</form></div>

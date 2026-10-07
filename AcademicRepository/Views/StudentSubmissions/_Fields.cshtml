@@ -1,0 +1,21 @@
+@model CreateSubmissionViewModel
+<div asp-validation-summary="All" class="text-danger" role="alert"></div>
+<div class="mb-3">
+<label for="submission-department" class="form-label">Department</label>
+<select id="submission-department" class="form-select" disabled aria-describedby="department-help">
+<option selected>@Model.DepartmentName</option>
+</select>
+<div id="department-help" class="form-text">Your department is assigned by the university and cannot be changed here.</div>
+</div>
+<p class="text-muted">Title and project type are required for a draft. Abstract and keywords are also required when submitting.</p>
+<div class="mb-3"><label asp-for="ProjectType" class="form-label"></label><select asp-for="ProjectType" asp-items="Html.GetEnumSelectList<ProjectType>()" class="form-select"><option value="">Select a project type</option></select></div>
+<div class="mb-3"><label asp-for="Title" class="form-label"></label><input asp-for="Title" class="form-control" maxlength="250" /></div>
+<div class="mb-3"><label asp-for="Abstract" class="form-label"></label><textarea asp-for="Abstract" class="form-control" rows="7" maxlength="10000"></textarea><div class="form-text">Up to 10,000 characters.</div></div>
+<div class="mb-3"><label asp-for="Keywords" class="form-label"></label><input asp-for="Keywords" class="form-control" maxlength="1000" /><div class="form-text">For example: databases, education, web applications.</div></div>
+<div class="row">
+<div class="col-md-6 mb-3"><label asp-for="SupervisorName" class="form-label"></label><input asp-for="SupervisorName" class="form-control" maxlength="150" /></div>
+<div class="col-md-6 mb-3"><label asp-for="CourseName" class="form-label"></label><input asp-for="CourseName" class="form-control" maxlength="150" /></div>
+<div class="col-md-4 mb-3"><label asp-for="CourseCode" class="form-label"></label><input asp-for="CourseCode" class="form-control" maxlength="30" /></div>
+<div class="col-md-4 mb-3"><label asp-for="AcademicYear" class="form-label"></label><input asp-for="AcademicYear" class="form-control" maxlength="30" /></div>
+<div class="col-md-4 mb-3"><label asp-for="Semester" class="form-label"></label><input asp-for="Semester" class="form-control" maxlength="50" /></div>
+</div>

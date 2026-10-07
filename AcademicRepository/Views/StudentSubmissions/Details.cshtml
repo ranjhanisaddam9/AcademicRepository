@@ -1,0 +1,22 @@
+@model SubmissionDetailsViewModel
+@{ ViewData["Title"] = "Submission Details"; }
+<h1>@Model.Title</h1>
+<p><partial name="_SubmissionStatus" model="Model.Status" /></p>
+<dl class="row">
+<dt class="col-sm-3">Project Type</dt><dd class="col-sm-9">@Html.DisplayFor(m => m.ProjectType)</dd>
+<dt class="col-sm-3">Student Name</dt><dd class="col-sm-9">@Model.StudentName</dd>
+<dt class="col-sm-3">Department</dt><dd class="col-sm-9">@Model.Department</dd>
+<dt class="col-sm-3">Abstract</dt><dd class="col-sm-9" style="white-space:pre-wrap">@(string.IsNullOrWhiteSpace(Model.Abstract) ? "Not provided" : Model.Abstract)</dd>
+<dt class="col-sm-3">Keywords</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Keywords) ? "Not provided" : Model.Keywords)</dd>
+<dt class="col-sm-3">Supervisor</dt><dd class="col-sm-9">@(Model.SupervisorName ?? "Not provided")</dd>
+<dt class="col-sm-3">Course</dt><dd class="col-sm-9">@(Model.CourseName ?? "Not provided")</dd>
+<dt class="col-sm-3">Course Code</dt><dd class="col-sm-9">@(Model.CourseCode ?? "Not provided")</dd>
+<dt class="col-sm-3">Academic Year</dt><dd class="col-sm-9">@(Model.AcademicYear ?? "Not provided")</dd>
+<dt class="col-sm-3">Semester</dt><dd class="col-sm-9">@(Model.Semester ?? "Not provided")</dd>
+<dt class="col-sm-3">Created (UTC)</dt><dd class="col-sm-9">@Model.CreatedAt.ToString("u")</dd>
+<dt class="col-sm-3">Updated (UTC)</dt><dd class="col-sm-9">@(Model.UpdatedAt?.ToString("u") ?? "Not updated")</dd>
+<dt class="col-sm-3">Submitted (UTC)</dt><dd class="col-sm-9">@(Model.SubmittedAt?.ToString("u") ?? "Not submitted")</dd>
+</dl>
+@if (Model.Status == SubmissionStatus.Draft) { <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">Edit</a> }
+<a class="btn btn-secondary" asp-action="Index">Back to My Submissions</a>
+@await Component.InvokeAsync("ProjectResources", new { submissionId = Model.Id })
