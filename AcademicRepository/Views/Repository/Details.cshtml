@@ -5,6 +5,7 @@
 <dl class="row">
 <dt class="col-sm-3">Student</dt><dd class="col-sm-9">@Model.StudentName</dd>
 <dt class="col-sm-3">Student ID</dt><dd class="col-sm-9">@(Model.StudentNumber ?? "Not recorded")</dd>
+@if (User.IsInRole("DepartmentHead")) { <dt class="col-sm-3">Student Email</dt><dd class="col-sm-9">@Model.StudentEmail</dd> }
 <dt class="col-sm-3">Department</dt><dd class="col-sm-9">@Model.Department</dd>
 <dt class="col-sm-3">Project Type</dt><dd class="col-sm-9">@Html.DisplayFor(m => m.ProjectType)</dd>
 <dt class="col-sm-3">Academic Year</dt><dd class="col-sm-9">@Model.AcademicYear</dd>

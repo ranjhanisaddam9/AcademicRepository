@@ -1,4 +1,8 @@
-# AcademicRepository — Milestones 1, 2, 3, 3.5, 4, 5, 6 and 7
+# AcademicRepository — Milestones 1, 2, 3, 3.5, 4, 5, 6, 7 and 8
+
+Milestone 8 adds the Department Head's read-only Academic Repository and department dashboard. Search approved snapshots by title, abstract, keywords, Student name/number and supervisor, with department-scoped filters, sorting and pagination. Counts and summaries use the same approved eligibility rules as the repository. See [MILESTONE8.md](MILESTONE8.md) for verification and preservation results. No new migration is required. The integration harness covers Milestones 1–8.
+
+The current academic year defaults to a July-start year (for example, `2026-2027`). Override it with `Repository:CurrentAcademicYear` in configuration or the `Repository__CurrentAcademicYear` environment variable to match the institution's stored academic-year labels.
 
 Milestone 7 adds the authenticated Approved Academic Repository. Students use **My Approved Projects** for their own projects; Coordinators use **Approved Repository** for their department. Metadata and downloads come from the version linked to the completed approval, with simple title/keyword search, filters and pagination. Incomplete approvals or unavailable resources are withheld. See [MILESTONE7.md](MILESTONE7.md) for verification and the known legacy approved record without files. No new migration is required. The integration harness covers Milestones 1–7.
 

@@ -4,7 +4,7 @@
 <h1>Sign In</h1>
 <section class="card card-body mb-4"><h2>Student Sign In</h2><p>Use your SMIU email address. A verification code will be emailed to you.</p><a class="btn btn-outline-primary" asp-action="StudentSignIn">Student Sign In</a></section>
 <h2>Staff Sign In</h2><p>For Admin, Coordinator, Department Head and ORIC / QEC. Use your assigned @@smiu.edu.pk account.</p>
-<p class="small">Coordinator accounts require an assigned department. Contact your administrator if your department is missing.</p>
+<p class="small">Coordinator accounts require an assigned department. Department Head accounts also require an assigned department. Contact your administrator if your department is missing.</p>
 <form asp-action="Login" method="post">
 <input asp-for="ReturnUrl" type="hidden" />
 <div asp-validation-summary="All" class="text-danger" role="alert"></div>

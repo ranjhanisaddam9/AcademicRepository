@@ -3,12 +3,30 @@
 <h1>@Model.Scope.Label</h1>
 <p>Approved Academic Repository · Results are limited to your authorized scope.</p>
 <form method="get" asp-action="Index" class="row g-3 mb-4">
-<div class="col-md-4"><label for="repository-search" class="form-label">Search title or keywords</label><input id="repository-search" name="Search" value="@Model.Filter.Search" maxlength="200" class="form-control" /></div>
+<div class="col-md-4"><label for="repository-search" class="form-label">@(Model.Scope.DepartmentHead ? "Search title, abstract, keywords, Student or supervisor" : "Search title or keywords")</label><input id="repository-search" name="Search" value="@Model.Filter.Search" maxlength="200" class="form-control" /></div>
 <div class="col-md-2"><label for="repository-type" class="form-label">Project Type</label><select id="repository-type" name="ProjectType" class="form-select"><option value="">All</option>
 @foreach (var type in Enum.GetValues<ProjectType>()) { <option value="@((int)type)" selected="@(Model.Filter.ProjectType == type)">@Html.DisplayFor(_ => type)</option> }
 </select></div>
-<div class="col-md-2"><label for="repository-year" class="form-label">Academic Year</label><input id="repository-year" name="AcademicYear" value="@Model.Filter.AcademicYear" maxlength="30" class="form-control" /></div>
+<div class="col-md-2"><label for="repository-year" class="form-label">Academic Year</label>
+@if (Model.Scope.DepartmentHead)
+{
+<select id="repository-year" name="AcademicYear" class="form-select"><option value="">All</option>
+@foreach (var year in Model.AcademicYears ?? []) { <option value="@year" selected="@(Model.Filter.AcademicYear == year)">@year</option> }
+</select>
+}
+else { <input id="repository-year" name="AcademicYear" value="@Model.Filter.AcademicYear" maxlength="30" class="form-control" /> }
+</div>
 <div class="col-md-2"><label for="repository-semester" class="form-label">Semester</label><input id="repository-semester" name="Semester" value="@Model.Filter.Semester" maxlength="50" class="form-control" /></div>
+@if (Model.Scope.DepartmentHead)
+{
+<div class="col-md-3"><label for="repository-supervisor" class="form-label">Supervisor</label><input id="repository-supervisor" name="Supervisor" value="@Model.Filter.Supervisor" maxlength="150" class="form-control" /></div>
+<div class="col-md-3"><label for="repository-sort" class="form-label">Sort</label><select id="repository-sort" name="Sort" class="form-select">
+<option value="0" selected="@(Model.Filter.Sort == RepositorySort.NewestApproved)">Newest Approved</option>
+<option value="1" selected="@(Model.Filter.Sort == RepositorySort.OldestApproved)">Oldest Approved</option>
+<option value="2" selected="@(Model.Filter.Sort == RepositorySort.TitleAZ)">Title A-Z</option>
+<option value="3" selected="@(Model.Filter.Sort == RepositorySort.TitleZA)">Title Z-A</option>
+</select></div>
+}
 <div class="col-md-2 align-self-end"><button class="btn btn-primary" type="submit">Search</button> <a asp-action="Index">Clear</a></div>
 </form>
 @if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Some approved records in your scope are incomplete or unavailable and have been withheld. Contact your administrator.</p> }
@@ -24,6 +42,6 @@ else
 </tbody></table></div>
 }
 <nav aria-label="Repository pages">
-@if (Model.Filter.Page > 1) { <a class="btn btn-outline-primary" asp-action="Index" asp-route-Page="@(Model.Filter.Page - 1)" asp-route-Search="@Model.Filter.Search" asp-route-ProjectType="@Model.Filter.ProjectType" asp-route-AcademicYear="@Model.Filter.AcademicYear" asp-route-Semester="@Model.Filter.Semester">Previous</a> }
-@if (Model.Filter.Page < Model.PageCount) { <a class="btn btn-outline-primary" asp-action="Index" asp-route-Page="@(Model.Filter.Page + 1)" asp-route-Search="@Model.Filter.Search" asp-route-ProjectType="@Model.Filter.ProjectType" asp-route-AcademicYear="@Model.Filter.AcademicYear" asp-route-Semester="@Model.Filter.Semester">Next</a> }
+@if (Model.Filter.Page > 1) { <a class="btn btn-outline-primary" asp-action="Index" asp-route-Page="@(Model.Filter.Page - 1)" asp-route-Search="@Model.Filter.Search" asp-route-ProjectType="@Model.Filter.ProjectType" asp-route-AcademicYear="@Model.Filter.AcademicYear" asp-route-Semester="@Model.Filter.Semester" asp-route-Supervisor="@Model.Filter.Supervisor" asp-route-Sort="@((int)Model.Filter.Sort)">Previous</a> }
+@if (Model.Filter.Page < Model.PageCount) { <a class="btn btn-outline-primary" asp-action="Index" asp-route-Page="@(Model.Filter.Page + 1)" asp-route-Search="@Model.Filter.Search" asp-route-ProjectType="@Model.Filter.ProjectType" asp-route-AcademicYear="@Model.Filter.AcademicYear" asp-route-Semester="@Model.Filter.Semester" asp-route-Supervisor="@Model.Filter.Supervisor" asp-route-Sort="@((int)Model.Filter.Sort)">Next</a> }
 </nav>

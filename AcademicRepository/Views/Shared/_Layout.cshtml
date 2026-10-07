@@ -16,7 +16,7 @@
         if (User.IsInRole(role))
         {
             var action = role switch { "Student" => "MySubmissions", "Coordinator" => "Submissions", "DepartmentHead" => "Repository", _ => "Administration" };
-            var label = role == "Student" ? "My Submissions" : action;
+            var label = role == "Student" ? "My Submissions" : role == "DepartmentHead" ? "Academic Repository" : action;
             <a class="text-white" asp-controller="@role" asp-action="Dashboard">@role Dashboard</a>
             if (role == "Admin")
             {

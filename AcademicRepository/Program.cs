@@ -74,6 +74,12 @@ builder.Services.ConfigureApplicationCookie(options =>
             tempData["Error"] = "Your Coordinator account has no department assigned. Contact your administrator before reviewing submissions.";
             tempData.Save();
         }
+        else if (user is not null && roles.Contains("DepartmentHead") && user.DepartmentId is null)
+        {
+            var tempData = context.HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataDictionaryFactory>().GetTempData(context.HttpContext);
+            tempData["Error"] = "Your DepartmentHead account has no department assigned. Contact your administrator before accessing the repository.";
+            tempData.Save();
+        }
         if (user is null || !ApplicationRoles.CanAuthenticate(user, roles) || context.Principal!.FindFirstValue(stampType) != user.SecurityStamp
             || (roles.Contains("Student") && !await context.HttpContext.RequestServices.GetRequiredService<StudentDepartmentService>().MatchesAsync(user)))
         {

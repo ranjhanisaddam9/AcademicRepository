@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AcademicRepository.Controllers;
 
-[Authorize(Roles = "Student,Coordinator")]
+[Authorize(Roles = "Student,Coordinator,DepartmentHead")]
 public sealed class RepositoryController(IRepositoryService repository, UserManager<ApplicationUser> users, ILogger<RepositoryController> logger) : Controller
 {
     private string UserId => users.GetUserId(User) ?? "";
