@@ -154,9 +154,10 @@ try
     await Milestone4Checks(factory, testEmailSender, storageRoot, password);
     await Milestone5Checks(factory, testEmailSender, testClock, password);
     await Milestone6Checks(factory, testEmailSender, testClock, password);
+    await Milestone7Checks(factory, testEmailSender, testClock, password);
     await Milestone35Checks(factory, password, testEmailSender, testClock);
     await OnboardingChecks(factory, testEmailSender, testClock);
-    Console.WriteLine("PASS: All Milestone 1, 2, 3, 3.5, 4, 5 and 6 SQL/MVC integration checks.");
+    Console.WriteLine("PASS: All Milestone 1, 2, 3, 3.5, 4, 5, 6 and 7 SQL/MVC integration checks.");
 }
 finally
 {

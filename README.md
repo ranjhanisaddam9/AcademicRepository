@@ -1,4 +1,6 @@
-# AcademicRepository — Milestones 1, 2, 3, 3.5, 4, 5 and 6
+# AcademicRepository — Milestones 1, 2, 3, 3.5, 4, 5, 6 and 7
+
+Milestone 7 adds the authenticated Approved Academic Repository. Students use **My Approved Projects** for their own projects; Coordinators use **Approved Repository** for their department. Metadata and downloads come from the version linked to the completed approval, with simple title/keyword search, filters and pagination. Incomplete approvals or unavailable resources are withheld. See [MILESTONE7.md](MILESTONE7.md) for verification and the known legacy approved record without files. No new migration is required. The integration harness covers Milestones 1–7.
 
 Milestone 6 adds rejected-submission revision, resubmission and immutable metadata/resource versions. Read feedback on Details, Start Revision, edit metadata/manage resources, then Resubmit from Edit Revision. Department and project type remain locked. Historical files remain available through authorized version pages, and new reviews link to new versions. See [MILESTONE6.md](MILESTONE6.md) for migration, tests, preservation evidence and legacy notes. The integration harness now covers Milestones 1–6.
 

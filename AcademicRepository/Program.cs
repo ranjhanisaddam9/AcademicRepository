@@ -48,6 +48,7 @@ builder.Services.AddScoped<ProjectFileService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<SubmissionWorkflowService>();
 builder.Services.AddScoped<SubmissionVersionService>();
+builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 builder.Services.AddSingleton<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddOptions<FileStorageOptions>().BindConfiguration("FileStorage").ValidateDataAnnotations().ValidateOnStart();
 var uploadLimit = builder.Configuration.GetValue<int?>("FileStorage:MaxFileSizeMB") ?? 50;

@@ -1,0 +1,28 @@
+@model RepositoryDetailsViewModel
+@{ ViewData["Title"] = Model.Title; }
+<h1>Academic Repository</h1>
+<h2>@Model.Title</h2><p><span class="badge bg-success">Approved</span> · Approved Version @Model.VersionNumber · Review Round @Model.ReviewRound</p>
+<dl class="row">
+<dt class="col-sm-3">Student</dt><dd class="col-sm-9">@Model.StudentName</dd>
+<dt class="col-sm-3">Student ID</dt><dd class="col-sm-9">@(Model.StudentNumber ?? "Not recorded")</dd>
+<dt class="col-sm-3">Department</dt><dd class="col-sm-9">@Model.Department</dd>
+<dt class="col-sm-3">Project Type</dt><dd class="col-sm-9">@Html.DisplayFor(m => m.ProjectType)</dd>
+<dt class="col-sm-3">Academic Year</dt><dd class="col-sm-9">@Model.AcademicYear</dd>
+<dt class="col-sm-3">Semester</dt><dd class="col-sm-9">@Model.Semester</dd>
+<dt class="col-sm-3">Supervisor</dt><dd class="col-sm-9">@Model.Supervisor</dd>
+<dt class="col-sm-3">Course</dt><dd class="col-sm-9">@Model.CourseName</dd>
+<dt class="col-sm-3">Course Code</dt><dd class="col-sm-9">@Model.CourseCode</dd>
+</dl>
+<h2 class="h4">Abstract</h2><p style="white-space:pre-wrap">@Model.Abstract</p>
+<h2 class="h4">Keywords</h2><p>@Model.Keywords</p>
+<h2 class="h4">Approval</h2><dl class="row">
+<dt class="col-sm-3">Submitted (UTC)</dt><dd class="col-sm-9">@Model.SubmittedAt.ToString("u")</dd>
+<dt class="col-sm-3">Approved (UTC)</dt><dd class="col-sm-9">@Model.ApprovedAt.ToString("u")</dd>
+<dt class="col-sm-3">Coordinator</dt><dd class="col-sm-9">@Model.ReviewerName</dd>
+<dt class="col-sm-3">Comments</dt><dd class="col-sm-9" style="white-space:pre-wrap">@(Model.ApprovalComments ?? "No comments provided.")</dd>
+</dl>
+<h2 class="h4">Approved Resource Materials</h2>
+<div class="table-responsive"><table class="table"><thead><tr><th>File</th><th>Resource Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th></th></tr></thead><tbody>
+@foreach (var file in Model.Files) { <tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td><a asp-action="Download" asp-route-id="@Model.SubmissionId" asp-route-versionId="@Model.VersionId" asp-route-fileId="@file.Id">Download</a></td></tr> }
+</tbody></table></div>
+<a class="btn btn-secondary" asp-action="Index">Back to Approved Projects</a>

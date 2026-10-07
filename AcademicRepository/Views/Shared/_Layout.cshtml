@@ -28,11 +28,13 @@
                 if (role == "Coordinator")
                 {
                     <a class="text-white" asp-controller="Coordinator" asp-action="ReviewQueue">Review Queue</a>
+                    <a class="text-white" asp-controller="Repository" asp-action="Index">Approved Repository</a>
                 }
                 <a class="text-white" asp-controller="@role" asp-action="@action">@label</a>
                 if (role == "Student")
                 {
                     <a class="text-white" asp-controller="StudentSubmissions" asp-action="Create">New Submission</a>
+                    <a class="text-white" asp-controller="Repository" asp-action="Index">My Approved Projects</a>
                 }
             }
         }

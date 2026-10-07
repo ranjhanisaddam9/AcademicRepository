@@ -79,6 +79,21 @@ internal static partial class IntegrationChecks
             Console.WriteLine("Approved without version: " + await Json("SELECT s.Id FROM ProjectSubmissions s WHERE s.Status=3 AND NOT EXISTS (SELECT 1 FROM SubmissionVersions v WHERE v.ProjectSubmissionId=s.Id)"));
             Console.WriteLine("Rejected without version: " + await Json("SELECT s.Id FROM ProjectSubmissions s WHERE s.Status=4 AND NOT EXISTS (SELECT 1 FROM SubmissionVersions v WHERE v.ProjectSubmissionId=s.Id)"));
             Console.WriteLine("Unlinked reviews: " + await Json("SELECT Id,ProjectSubmissionId,ReviewRound,Decision FROM SubmissionReviews WHERE SubmissionVersionId IS NULL"));
+            foreach (var (name, sql) in new Dictionary<string, string>
+            {
+                ["VersionSnapshots"] = "SELECT * FROM SubmissionVersions ORDER BY Id",
+                ["VersionResourceSets"] = "SELECT * FROM SubmissionVersionFiles ORDER BY SubmissionVersionId,ProjectFileId"
+            })
+            {
+                var json = await Json(sql);
+                using var document = JsonDocument.Parse(json);
+                Console.WriteLine($"{name}: count={document.RootElement.GetArrayLength()}, SHA256={Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)))}");
+            }
+            Console.WriteLine("Approved projects: " + await Json("SELECT Id,Title FROM ProjectSubmissions WHERE Status=3 ORDER BY Id"));
+            Console.WriteLine("Approved projects without completed approval: " + await Json("SELECT s.Id FROM ProjectSubmissions s WHERE s.Status=3 AND NOT EXISTS (SELECT 1 FROM SubmissionReviews r WHERE r.ProjectSubmissionId=s.Id AND r.Decision=1 AND r.CompletedAt IS NOT NULL)"));
+            Console.WriteLine("Approved reviews without version: " + await Json("SELECT r.Id,r.ProjectSubmissionId FROM SubmissionReviews r LEFT JOIN SubmissionVersions v ON v.Id=r.SubmissionVersionId WHERE r.Decision=1 AND v.Id IS NULL"));
+            Console.WriteLine("Approved versions without resources: " + await Json("SELECT r.ProjectSubmissionId,v.Id AS VersionId FROM SubmissionReviews r JOIN SubmissionVersions v ON v.Id=r.SubmissionVersionId WHERE r.Decision=1 AND NOT EXISTS (SELECT 1 FROM SubmissionVersionFiles f WHERE f.SubmissionVersionId=v.Id)"));
+            Console.WriteLine("Inconsistent approved version links: " + await Json("SELECT r.Id,r.ProjectSubmissionId FROM SubmissionReviews r JOIN SubmissionVersions v ON v.Id=r.SubmissionVersionId JOIN ProjectSubmissions s ON s.Id=r.ProjectSubmissionId WHERE r.Decision=1 AND (v.ProjectSubmissionId<>r.ProjectSubmissionId OR v.VersionNumber<>r.ReviewRound OR v.DepartmentIdSnapshot<>s.DepartmentId OR v.CreatedByUserId<>s.StudentId OR r.CompletedAt IS NULL OR r.CompletedAt<r.StartedAt OR v.SubmittedAt>r.StartedAt OR EXISTS (SELECT 1 FROM SubmissionReviews p WHERE p.ProjectSubmissionId=s.Id AND p.Decision=0) OR (SELECT COUNT(*) FROM SubmissionReviews a WHERE a.ProjectSubmissionId=s.Id AND a.Decision=1)<>1)"));
         }
         Console.WriteLine("Approved/Rejected without review history: " + await Json("SELECT s.Id,s.Title,s.Status FROM ProjectSubmissions s WHERE s.Status IN (3,4)" +
             (hasReviews ? " AND NOT EXISTS (SELECT 1 FROM SubmissionReviews r WHERE r.ProjectSubmissionId=s.Id)" : "")));
