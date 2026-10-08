@@ -23,7 +23,12 @@
                 <a class="text-white" asp-controller="Departments" asp-action="Index">Departments</a>
                 <a class="text-white" asp-controller="Users" asp-action="Index">Users</a>
             }
-            else if (role != "ORICQEC")
+            else if (role == "ORICQEC")
+            {
+                <a class="text-white" asp-controller="ORICQEC" asp-action="Repository">Academic Repository</a>
+                <a class="text-white" asp-controller="ORICQEC" asp-action="Reports">Reports</a>
+            }
+            else
             {
                 if (role == "Coordinator")
                 {

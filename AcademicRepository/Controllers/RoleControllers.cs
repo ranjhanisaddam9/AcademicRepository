@@ -22,9 +22,3 @@ public class AdminController(DashboardService dashboard) : Controller
     public async Task<IActionResult> Dashboard() => View("~/Views/Home/Index.cshtml", await dashboard.GetAsync(User));
     public IActionResult Administration() => RedirectToAction("Index", "Users");
 }
-
-[Authorize(Roles = "ORICQEC")]
-public class ORICQECController(DashboardService dashboard) : Controller
-{
-    public async Task<IActionResult> Dashboard() => View(await dashboard.GetAsync(User));
-}

@@ -182,7 +182,7 @@ internal static partial class IntegrationChecks
         using var anonymous = Client(factory);
         foreach (var path in new[] { "/Repository", $"/Repository/Details/{project.Id}", Download(project.Id, approved.Id, report.Id) })
             Check((await anonymous.GetAsync(path)).StatusCode == HttpStatusCode.Redirect, "Anonymous repository access denied: " + path);
-        foreach (var role in new[] { "Admin", "ORICQEC" })
+        foreach (var role in new[] { "Admin" })
         {
             using var staff = Client(factory); await LoginAsync(staff, role + "@smiu.edu.pk", password);
             foreach (var path in new[] { "/Repository", $"/Repository/Details/{project.Id}", Download(project.Id, approved.Id, report.Id) })

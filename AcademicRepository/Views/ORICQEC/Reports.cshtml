@@ -1,0 +1,21 @@
+@model InstitutionRepositoryReport
+@{ ViewData["Title"] = "Institution Repository Reports"; }
+<h1>Institution Repository Reports</h1>
+<p>Read-only reports from available approved-version records. Total approved projects: <strong data-insight="approved">@Model.Total</strong>.</p>
+@if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Incomplete or unavailable approved records are excluded. Contact your administrator.</p> }
+<p><a asp-action="Repository">Filter repository and export CSV</a> · <a asp-action="Export">Export all approved repository records</a></p>
+<h2 class="h4">Department Comparison</h2>
+<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Department</th><th>FYP</th><th>Semester</th><th>Research</th><th>Assignment</th><th>Total</th></tr></thead><tbody>
+@foreach (var row in Model.Departments) { <tr><td>@row.Department</td><td>@row.FinalYearProjects</td><td>@row.SemesterProjects</td><td>@row.ResearchProjects</td><td>@row.Assignments</td><td>@row.Total</td></tr> }
+</tbody></table></div>
+<div class="row"><div class="col-md-4"><h2 class="h4">Projects by Type</h2><table class="table"><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody>
+@foreach (var type in Enum.GetValues<ProjectType>()) { <tr><td>@Html.DisplayFor(_ => type)</td><td>@(Model.ProjectTypes.SingleOrDefault(t => t.Type == type)?.Count ?? 0)</td></tr> }
+</tbody></table></div><div class="col-md-4"><h2 class="h4">Projects by Academic Year</h2><table class="table"><thead><tr><th>Academic Year</th><th>Count</th></tr></thead><tbody>
+@foreach (var row in Model.AcademicYears) { <tr><td>@row.Label</td><td>@row.Count</td></tr> }
+</tbody></table></div><div class="col-md-4"><h2 class="h4">Projects by Semester</h2><table class="table"><thead><tr><th>Semester</th><th>Count</th></tr></thead><tbody>
+@foreach (var row in Model.Semesters) { <tr><td>@row.Label</td><td>@row.Count</td></tr> }
+</tbody></table></div></div>
+<h2 class="h4">Approval Trend</h2><p>Monthly counts use completed approval dates in UTC.</p>
+<table class="table"><thead><tr><th>Month</th><th>Approved Projects</th></tr></thead><tbody>
+@foreach (var row in Model.ApprovalTrend) { <tr><td>@row.Year-@row.Month.ToString("00")</td><td>@row.Count</td></tr> }
+</tbody></table>

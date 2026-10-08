@@ -7,30 +7,42 @@ namespace AcademicRepository.Services;
 
 public interface IRepositoryService
 {
-    Task<RepositoryListViewModel> GetApprovedProjectsAsync(string userId, RepositoryFilterViewModel filter);
-    Task<RepositoryDetailsViewModel> GetApprovedProjectDetailsAsync(string userId, int submissionId);
-    Task<(Stream Stream, string Name, string ContentType)> DownloadAsync(string userId, int submissionId, int versionId, int fileId);
+    Task<RepositoryListViewModel> GetApprovedProjectsAsync(string userId, RepositoryFilterViewModel filter, bool institutionWide = false);
+    Task<RepositoryDetailsViewModel> GetApprovedProjectDetailsAsync(string userId, int submissionId, bool institutionWide = false);
+    Task<(Stream Stream, string Name, string ContentType)> DownloadAsync(string userId, int submissionId, int versionId, int fileId, bool institutionWide = false);
     Task<DepartmentRepositoryStats> GetDepartmentRepositoryStatsAsync(string userId);
 }
 
 public sealed class RepositoryService(ApplicationDbContext db, UserManager<ApplicationUser> users,
     IFileStorageService storage, ILogger<RepositoryService> logger, TimeProvider clock, IConfiguration configuration) : IRepositoryService
 {
-    private async Task<RepositoryScope> ScopeAsync(string userId)
+    private async Task<RepositoryScope> ScopeAsync(string userId, bool institutionWide = false)
     {
         var user = await db.Users.AsNoTracking().Include(u => u.Department).SingleOrDefaultAsync(u => u.Id == userId);
         if (user is null || !user.IsActive || !InstitutionalEmail.IsValid(user.Email))
             throw new ReviewOperationException(403, "An active institutional account is required.");
+        var oric = await users.IsInRoleAsync(user, "ORICQEC");
+        var head = await users.IsInRoleAsync(user, "DepartmentHead");
+        var coordinator = await users.IsInRoleAsync(user, "Coordinator");
+        var student = await users.IsInRoleAsync(user, "Student");
+        if ((head || coordinator || student) && (user.DepartmentId is null || user.Department is null))
+            throw new ReviewOperationException(403, "Your account requires an assigned department. Contact your administrator.");
+        if (institutionWide)
+        {
+            if (!oric) throw new ReviewOperationException(403, "ORICQEC access is required for institution-wide reporting and export.");
+            return new("Institution-Wide Academic Repository", userId, 0, true, InstitutionWide: true);
+        }
+        if (oric && !head && !coordinator && !student) return new("Institution-Wide Academic Repository", userId, 0, true, InstitutionWide: true);
         if (user.DepartmentId is null || user.Department is null)
             throw new ReviewOperationException(403, "Your account requires an assigned department. Contact your administrator.");
-        if (await users.IsInRoleAsync(user, "DepartmentHead")) return new(user.Department.Name + " Academic Repository", userId, user.DepartmentId.Value, true, true, user.Department.Name);
-        if (await users.IsInRoleAsync(user, "Coordinator")) return new("Approved Repository — " + user.Department.Name, userId, user.DepartmentId.Value, true);
-        if (await users.IsInRoleAsync(user, "Student")) return new("My Approved Projects", userId, user.DepartmentId.Value, false);
-        throw new ReviewOperationException(403, "Repository access requires a Student, Coordinator or DepartmentHead role.");
+        if (head) return new(user.Department.Name + " Academic Repository", userId, user.DepartmentId.Value, true, true, user.Department.Name);
+        if (coordinator) return new("Approved Repository — " + user.Department.Name, userId, user.DepartmentId.Value, true);
+        if (student) return new("My Approved Projects", userId, user.DepartmentId.Value, false);
+        throw new ReviewOperationException(403, "Repository access requires a Student, Coordinator, DepartmentHead or ORICQEC role.");
     }
 
     private IQueryable<ProjectSubmission> ApprovedScope(RepositoryScope scope) => db.ProjectSubmissions.AsNoTracking()
-        .Where(s => s.Status == SubmissionStatus.Approved && s.DepartmentId == scope.DepartmentId && (scope.DepartmentWide || s.StudentId == scope.UserId));
+        .Where(s => s.Status == SubmissionStatus.Approved && (scope.InstitutionWide || (s.DepartmentId == scope.DepartmentId && (scope.DepartmentWide || s.StudentId == scope.UserId))));
 
     // Single source of truth for list, details and download. Resolve by the approved review's link, never MAX(version).
     private IQueryable<SubmissionReview> EligibleReviews(RepositoryScope scope)
@@ -50,15 +62,16 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
             && r.SubmissionVersion.Files.All(f => f.ProjectFile.ProjectSubmissionId == r.ProjectSubmissionId && f.ProjectFile.FileSize > 0));
     }
 
-    private static IQueryable<RepositoryListItem> Items(IQueryable<SubmissionReview> query, RepositorySort sort = RepositorySort.NewestApproved)
+    internal static IOrderedQueryable<SubmissionReview> OrderedReviews(IQueryable<SubmissionReview> query, RepositorySort sort) => sort switch
     {
-        var ordered = sort switch
-        {
             RepositorySort.OldestApproved => query.OrderBy(r => r.CompletedAt).ThenBy(r => r.ProjectSubmissionId),
             RepositorySort.TitleAZ => query.OrderBy(r => r.SubmissionVersion!.TitleSnapshot).ThenBy(r => r.ProjectSubmissionId),
             RepositorySort.TitleZA => query.OrderByDescending(r => r.SubmissionVersion!.TitleSnapshot).ThenByDescending(r => r.ProjectSubmissionId),
             _ => query.OrderByDescending(r => r.CompletedAt).ThenByDescending(r => r.ProjectSubmissionId)
-        };
+    };
+    private static IQueryable<RepositoryListItem> Items(IQueryable<SubmissionReview> query, RepositorySort sort = RepositorySort.NewestApproved)
+    {
+        var ordered = OrderedReviews(query, sort);
         return ordered.Select(r => new RepositoryListItem(r.ProjectSubmissionId, r.SubmissionVersionId!.Value, r.SubmissionVersion!.VersionNumber,
             r.SubmissionVersion.TitleSnapshot, r.ProjectSubmission.Student.FullName, r.ProjectSubmission.Student.StudentNumber,
             r.SubmissionVersion.Department.Name, r.SubmissionVersion.ProjectTypeSnapshot, r.SubmissionVersion.AcademicYearSnapshot,
@@ -83,22 +96,18 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
         return true;
     }
 
-    public async Task<RepositoryListViewModel> GetApprovedProjectsAsync(string userId, RepositoryFilterViewModel filter)
+    private IQueryable<SubmissionReview> ApplyFilters(IQueryable<SubmissionReview> query, RepositoryScope scope, RepositoryFilterViewModel filter)
     {
-        var scope = await ScopeAsync(userId);
         if (filter.Search?.Length > 200 || filter.AcademicYear?.Length > 30 || filter.Semester?.Length > 50 || filter.Page < 1
-            || filter.Supervisor?.Length > 150 || !Enum.IsDefined(filter.Sort)
+            || filter.Supervisor?.Length > 150 || filter.DepartmentId < 1 || !Enum.IsDefined(filter.Sort)
             || (filter.ProjectType.HasValue && !Enum.IsDefined(filter.ProjectType.Value)))
             throw new ReviewOperationException(400, "Choose valid repository search criteria.");
-        var query = EligibleReviews(scope);
-        var years = scope.DepartmentHead ? await query.Where(r => r.SubmissionVersion!.AcademicYearSnapshot != null && r.SubmissionVersion.AcademicYearSnapshot != "")
-            .Select(r => r.SubmissionVersion!.AcademicYearSnapshot!).Distinct().OrderByDescending(y => y).Take(100).ToListAsync() : null;
-        var inconsistent = await ApprovedScope(scope).AnyAsync(s => !query.Any(r => r.ProjectSubmissionId == s.Id));
-        if (inconsistent) logger.LogWarning("Inconsistent approved repository records detected in authorized scope for user {UserId}.", userId);
+        // A department parameter never overrides Student/Coordinator/Head scope.
+        if (scope.InstitutionWide && filter.DepartmentId.HasValue) query = query.Where(r => r.ProjectSubmission.DepartmentId == filter.DepartmentId.Value);
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var text = filter.Search.Trim();
-            if (scope.DepartmentHead)
+            if (scope.ExtendedSearch)
                 query = query.Where(r => EF.Functions.Collate(r.SubmissionVersion!.TitleSnapshot, "Latin1_General_100_CI_AS").Contains(text)
                     || EF.Functions.Collate(r.SubmissionVersion.AbstractSnapshot, "Latin1_General_100_CI_AS").Contains(text)
                     || EF.Functions.Collate(r.SubmissionVersion.KeywordsSnapshot, "Latin1_General_100_CI_AS").Contains(text)
@@ -109,33 +118,70 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
         }
         if (!string.IsNullOrWhiteSpace(filter.Supervisor))
         {
-            if (!scope.DepartmentHead) throw new ReviewOperationException(400, "Supervisor filtering is available on the DepartmentHead repository.");
+            if (!scope.ExtendedSearch) throw new ReviewOperationException(400, "Supervisor filtering requires DepartmentHead or ORICQEC repository access.");
             var supervisor = filter.Supervisor.Trim();
             query = query.Where(r => r.SubmissionVersion!.SupervisorNameSnapshot != null && EF.Functions.Collate(r.SubmissionVersion.SupervisorNameSnapshot, "Latin1_General_100_CI_AS").Contains(supervisor));
         }
         if (filter.ProjectType.HasValue) query = query.Where(r => r.SubmissionVersion!.ProjectTypeSnapshot == filter.ProjectType);
         if (!string.IsNullOrWhiteSpace(filter.AcademicYear)) { var year = filter.AcademicYear.Trim(); query = query.Where(r => r.SubmissionVersion!.AcademicYearSnapshot == year); }
         if (!string.IsNullOrWhiteSpace(filter.Semester)) { var semester = filter.Semester.Trim(); query = query.Where(r => r.SubmissionVersion!.SemesterSnapshot == semester); }
+        return query;
+    }
+
+    internal async Task<IQueryable<SubmissionReview>> InstitutionQueryAsync(string userId, RepositoryFilterViewModel filter)
+    {
+        var scope = await ScopeAsync(userId, true);
+        return ApplyFilters(EligibleReviews(scope), scope, filter);
+    }
+
+    internal async Task<bool> HasInconsistentInstitutionRecordsAsync(string userId)
+    {
+        var scope = await ScopeAsync(userId, true);
+        var eligible = EligibleReviews(scope);
+        var inconsistent = await ApprovedScope(scope).AnyAsync(s => !eligible.Any(r => r.ProjectSubmissionId == s.Id));
+        if (inconsistent) logger.LogWarning("Inconsistent approved institution repository records detected for authorized user {UserId}.", userId);
+        return inconsistent;
+    }
+
+    internal async Task<HashSet<int>> AvailableVersionIdsAsync(int[] ids, CancellationToken cancellationToken = default)
+    {
+        var resources = await db.SubmissionVersionFiles.AsNoTracking().Where(f => ids.Contains(f.SubmissionVersionId))
+            .Select(f => new { f.SubmissionVersionId, File = f.ProjectFile }).ToListAsync(cancellationToken);
+        var available = new HashSet<int>();
+        foreach (var id in ids)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var files = resources.Where(f => f.SubmissionVersionId == id).Select(f => f.File).ToList();
+            if (files.Count > 0 && await AvailableAsync(files)) available.Add(id);
+        }
+        return available;
+    }
+
+    public async Task<RepositoryListViewModel> GetApprovedProjectsAsync(string userId, RepositoryFilterViewModel filter, bool institutionWide = false)
+    {
+        var scope = await ScopeAsync(userId, institutionWide);
+        var eligible = EligibleReviews(scope);
+        var query = ApplyFilters(eligible, scope, filter);
+        var years = scope.ExtendedSearch ? await eligible.Where(r => r.SubmissionVersion!.AcademicYearSnapshot != null && r.SubmissionVersion.AcademicYearSnapshot != "")
+            .Select(r => r.SubmissionVersion!.AcademicYearSnapshot!).Distinct().OrderByDescending(y => y).Take(100).ToListAsync() : null;
+        var departments = scope.InstitutionWide ? await db.Departments.AsNoTracking().Where(d => d.IsActive).OrderBy(d => d.Name)
+            .Select(d => new RepositoryDepartmentOption(d.Id, d.Name)).ToListAsync() : null;
+        var inconsistent = await ApprovedScope(scope).AnyAsync(s => !eligible.Any(r => r.ProjectSubmissionId == s.Id));
+        if (inconsistent) logger.LogWarning("Inconsistent approved repository records detected in authorized scope for user {UserId}.", userId);
         const int pageSize = 20;
         var total = await query.CountAsync();
         var pages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
         filter.Page = Math.Min(filter.Page, pages);
         var page = await Items(query, filter.Sort).Skip((filter.Page - 1) * pageSize).Take(pageSize).ToListAsync();
-        var versionIds = page.Select(i => i.VersionId).ToArray();
-        var resources = await db.SubmissionVersionFiles.AsNoTracking().Where(f => versionIds.Contains(f.SubmissionVersionId))
-            .Select(f => new { f.SubmissionVersionId, File = f.ProjectFile }).ToListAsync();
-        var available = new List<RepositoryListItem>();
-        foreach (var item in page)
-        {
-            if (await AvailableAsync(resources.Where(f => f.SubmissionVersionId == item.VersionId).Select(f => f.File))) available.Add(item);
-            else inconsistent = true;
-        }
-        return new(scope, filter, available, total, pages, inconsistent, years);
+        var availableIds = await AvailableVersionIdsAsync(page.Select(i => i.VersionId).ToArray());
+        var available = page.Where(i => availableIds.Contains(i.VersionId)).ToList();
+        inconsistent |= available.Count != page.Count;
+        return new(scope, filter, available, total, pages, inconsistent, years, departments);
     }
 
-    private async Task<SubmissionReview> ResolveAsync(string userId, int submissionId)
+    private async Task<SubmissionReview> ResolveAsync(string userId, int submissionId, bool institutionWide = false)
     {
-        var scope = await ScopeAsync(userId);
+        var scope = await ScopeAsync(userId, institutionWide);
         var review = await EligibleReviews(scope).Include(r => r.ProjectSubmission.Student)
             .Include(r => r.Reviewer).Include(r => r.SubmissionVersion!.Department).SingleOrDefaultAsync(r => r.ProjectSubmissionId == submissionId);
         if (review is null)
@@ -149,9 +195,9 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
     private Task<List<ProjectFile>> ResourcesAsync(int versionId) => db.SubmissionVersionFiles.AsNoTracking()
         .Where(f => f.SubmissionVersionId == versionId).OrderBy(f => f.ProjectFile.UploadedAt).ThenBy(f => f.ProjectFileId).Select(f => f.ProjectFile).ToListAsync();
 
-    public async Task<RepositoryDetailsViewModel> GetApprovedProjectDetailsAsync(string userId, int submissionId)
+    public async Task<RepositoryDetailsViewModel> GetApprovedProjectDetailsAsync(string userId, int submissionId, bool institutionWide = false)
     {
-        var review = await ResolveAsync(userId, submissionId);
+        var review = await ResolveAsync(userId, submissionId, institutionWide);
         var v = review.SubmissionVersion!;
         var files = await ResourcesAsync(v.Id);
         if (!await AvailableAsync(files)) throw new ReviewOperationException(404, "Approved repository entry is currently unavailable. Contact your administrator.");
@@ -159,7 +205,7 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
             review.ProjectSubmission.Student.StudentNumber, v.Department.Name, v.TitleSnapshot, v.AbstractSnapshot, v.KeywordsSnapshot,
             v.ProjectTypeSnapshot, v.SupervisorNameSnapshot, v.CourseNameSnapshot, v.CourseCodeSnapshot, v.AcademicYearSnapshot, v.SemesterSnapshot,
             v.SubmittedAt, review.CompletedAt!.Value, review.Reviewer.FullName, review.Comments,
-            files.Select(f => new ProjectFileViewModel(f.Id, f.OriginalFileName, f.ResourceType, f.Description, f.FileSize, f.UploadedAt)).ToList(), review.ProjectSubmission.Student.Email);
+            files.Select(f => new ProjectFileViewModel(f.Id, f.OriginalFileName, f.ResourceType, f.Description, f.FileSize, f.UploadedAt)).ToList(), review.ProjectSubmission.Student.Email, institutionWide);
     }
     public async Task<DepartmentRepositoryStats> GetDepartmentRepositoryStatsAsync(string userId)
     {
@@ -176,9 +222,9 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
         var recent = await GetApprovedProjectsAsync(userId, new());
         return new(scope.DepartmentName, total, types, years, semesters, currentYear, currentCount, recent.Items.Take(5).ToList(), recent.HasUnavailableRecords);
     }
-    public async Task<(Stream Stream, string Name, string ContentType)> DownloadAsync(string userId, int submissionId, int versionId, int fileId)
+    public async Task<(Stream Stream, string Name, string ContentType)> DownloadAsync(string userId, int submissionId, int versionId, int fileId, bool institutionWide = false)
     {
-        var review = await ResolveAsync(userId, submissionId);
+        var review = await ResolveAsync(userId, submissionId, institutionWide);
         if (review.SubmissionVersionId != versionId) throw new ReviewOperationException(404, "Approved resource not found.");
         var files = await ResourcesAsync(versionId);
         var file = files.SingleOrDefault(f => f.Id == fileId);
