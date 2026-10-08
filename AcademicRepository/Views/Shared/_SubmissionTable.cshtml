@@ -5,7 +5,7 @@
 }
 else
 {
-<div class="table-responsive" tabindex="0" role="region" aria-label="Submission results"><table class="table table-striped"><thead><tr><th>Title</th><th>Type</th><th>Department</th><th>Created (UTC)</th><th>Submitted (UTC)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+<div class="table-responsive" tabindex="0" role="region" aria-label="Submission results"><table class="table table-striped"><thead><tr><th scope="col">Title</th><th scope="col">Type</th><th scope="col">Department</th><th scope="col">Created (UTC)</th><th scope="col">Submitted (UTC)</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead><tbody>
 @foreach (var submission in Model)
 {
     <tr><td>@submission.Title</td><td>@Html.DisplayFor(_ => submission.ProjectType)</td><td>@submission.Department</td><td>@submission.CreatedAt.ToString("u")</td><td>@(submission.SubmittedAt?.ToString("u") ?? "Not submitted")</td><td><partial name="_SubmissionStatus" model="submission.Status" /></td><td>

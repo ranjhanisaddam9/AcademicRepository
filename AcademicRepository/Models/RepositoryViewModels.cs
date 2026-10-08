@@ -9,11 +9,16 @@ public sealed class RepositoryFilterViewModel
     [EnumDataType(typeof(ProjectType)), Display(Name = "Project Type")] public ProjectType? ProjectType { get; set; }
     [StringLength(30), Display(Name = "Academic Year")] public string? AcademicYear { get; set; }
     [StringLength(50)] public string? Semester { get; set; }
+    [DataType(DataType.Date)] public DateOnly? ApprovedFrom { get; set; }
+    [DataType(DataType.Date)] public DateOnly? ApprovedTo { get; set; }
     public int Page { get; set; } = 1;
     public int? PageSize { get; set; }
     [StringLength(150)] public string? Supervisor { get; set; }
     [EnumDataType(typeof(RepositorySort))] public RepositorySort Sort { get; set; }
     [Range(1, int.MaxValue)] public int? DepartmentId { get; set; }
+
+    public bool HasValidApprovalDateRange => !ApprovedTo.HasValue
+        || (ApprovedTo.Value < DateOnly.MaxValue && (!ApprovedFrom.HasValue || ApprovedFrom.Value <= ApprovedTo.Value));
 }
 
 public sealed record RepositoryScope(string Label, string UserId, int DepartmentId, bool DepartmentWide, bool DepartmentHead = false, string DepartmentName = "", bool InstitutionWide = false)

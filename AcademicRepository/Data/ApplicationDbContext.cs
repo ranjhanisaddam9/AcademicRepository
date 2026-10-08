@@ -22,6 +22,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<SystemSetting>(entity =>
         {
             entity.HasIndex(s => s.Key).IsUnique();
+            entity.Property(s => s.RowVersion).IsRowVersion();
             entity.Property(s => s.Key).UseCollation("Latin1_General_100_CI_AS");
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(s => s.UpdatedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -93,6 +94,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         });
         builder.Entity<Department>(entity =>
         {
+            entity.Property(d => d.RowVersion).IsRowVersion();
             entity.Property(d => d.Name).IsRequired().HasMaxLength(120).UseCollation("Latin1_General_100_CI_AS");
             entity.Property(d => d.Code).IsRequired().HasMaxLength(20).UseCollation("Latin1_General_100_CI_AS");
             entity.HasIndex(d => d.Name).IsUnique();
@@ -103,6 +105,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         });
         builder.Entity<ApplicationUser>(entity =>
         {
+            entity.Property(u => u.RowVersion).IsRowVersion();
             entity.Property(u => u.FullName).IsRequired().HasMaxLength(150);
             entity.Property(u => u.StudentNumber).HasMaxLength(11).UseCollation("Latin1_General_100_CI_AS");
             entity.HasIndex(u => u.StudentNumber).IsUnique().HasFilter("[StudentNumber] IS NOT NULL");

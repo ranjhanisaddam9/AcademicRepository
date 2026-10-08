@@ -17,6 +17,7 @@ public sealed class OperationalSettingsViewModel
     [StringLength(256), EmailAddress] public string? SupportEmail { get; set; }
     [ValidateNever] public DateTime? UpdatedAt { get; set; }
     [ValidateNever] public string? UpdatedBy { get; set; }
+    public string? ConcurrencyToken { get; set; }
 }
 
 public sealed record AdminCount(string Label, int Count);

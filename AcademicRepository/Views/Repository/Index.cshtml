@@ -11,12 +11,14 @@
         new("AcademicYear", "Academic Year", Model.Filter.AcademicYear, Model.Scope.ExtendedSearch ? "select" : "text", MaxLength: 30,
             Options: Model.Scope.ExtendedSearch ? new[] { new FilterOptionViewModel("", "All years") }.Concat((Model.AcademicYears ?? []).Select(y => new FilterOptionViewModel(y, y))).ToArray() : null),
         new("Semester", "Semester", Model.Filter.Semester, MaxLength: 50),
+        new("ApprovedFrom", "Approved from", Model.Filter.ApprovedFrom?.ToString("yyyy-MM-dd"), "date", MaxLength: 10),
+        new("ApprovedTo", "Approved through", Model.Filter.ApprovedTo?.ToString("yyyy-MM-dd"), "date", MaxLength: 10),
         new("Sort", "Sort by", ((int)Model.Filter.Sort).ToString(), "select", Options: new[] { new FilterOptionViewModel("0", "Newest approved"), new("1", "Oldest approved"), new("2", "Title A–Z"), new("3", "Title Z–A") })
     };
     if (Model.Scope.InstitutionWide) fields.Insert(1, new FilterFieldViewModel("DepartmentId", "Department", Model.Filter.DepartmentId?.ToString() ?? "", "select", Options: new[] { new FilterOptionViewModel("", "All departments") }.Concat((Model.Departments ?? []).Select(d => new FilterOptionViewModel(d.Id.ToString(), d.Name))).ToArray()));
     if (Model.Scope.ExtendedSearch) fields.Add(new FilterFieldViewModel("Supervisor", "Supervisor", Model.Filter.Supervisor, MaxLength: 150));
     var filter = new FilterPanelViewModel(action, controller, action, fields, Model.Results.PageSize, "Search");
-    var route = new Dictionary<string, string> { ["Search"] = Model.Filter.Search ?? "", ["DepartmentId"] = Model.Filter.DepartmentId?.ToString() ?? "", ["ProjectType"] = Model.Filter.ProjectType?.ToString() ?? "", ["AcademicYear"] = Model.Filter.AcademicYear ?? "", ["Semester"] = Model.Filter.Semester ?? "", ["Supervisor"] = Model.Filter.Supervisor ?? "", ["Sort"] = ((int)Model.Filter.Sort).ToString(), ["pageSize"] = Model.Results.PageSize.ToString() };
+    var route = new Dictionary<string, string> { ["Search"] = Model.Filter.Search ?? "", ["DepartmentId"] = Model.Filter.DepartmentId?.ToString() ?? "", ["ProjectType"] = Model.Filter.ProjectType?.ToString() ?? "", ["AcademicYear"] = Model.Filter.AcademicYear ?? "", ["Semester"] = Model.Filter.Semester ?? "", ["Supervisor"] = Model.Filter.Supervisor ?? "", ["ApprovedFrom"] = Model.Filter.ApprovedFrom?.ToString("yyyy-MM-dd") ?? "", ["ApprovedTo"] = Model.Filter.ApprovedTo?.ToString("yyyy-MM-dd") ?? "", ["Sort"] = ((int)Model.Filter.Sort).ToString(), ["pageSize"] = Model.Results.PageSize.ToString() };
     var pages = new PaginationViewModel(action, controller, Model.Results.PageNumber, Model.Results.PageSize, Model.Results.TotalCount, "Approved repository", route);
     var rows = Model.Items.Select(item => new DataTableRowViewModel(new DataTableCellViewModel[]
     {

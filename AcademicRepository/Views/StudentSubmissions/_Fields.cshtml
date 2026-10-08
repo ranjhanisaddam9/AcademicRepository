@@ -10,16 +10,16 @@
 <p class="form-text mb-3">Title and project type are required for a draft. Abstract and keywords are also required when submitting.</p>
 @if (ViewData["Revision"] is true)
 {
-<div class="mb-3"><label class="form-label">Project Type</label><select class="form-select" disabled><option selected>@Model.ProjectType</option></select><input asp-for="ProjectType" type="hidden" /><div class="form-text">Project type is locked after the first submission.</div></div>
+<div class="mb-3"><label for="revision-project-type" class="form-label">Project Type</label><select id="revision-project-type" class="form-select" disabled><option selected>@Model.ProjectType</option></select><input asp-for="ProjectType" type="hidden" /><div class="form-text">Project type is locked after the first submission.</div></div>
 }
-else { <div class="mb-3"><label asp-for="ProjectType" class="form-label"></label><select asp-for="ProjectType" asp-items="Html.GetEnumSelectList<ProjectType>()" class="form-select"><option value="">Select a project type</option></select></div> }
-<div class="mb-3"><label asp-for="Title" class="form-label"></label><input asp-for="Title" class="form-control" maxlength="250" /></div>
-<div class="mb-3"><label asp-for="Abstract" class="form-label"></label><textarea asp-for="Abstract" class="form-control" rows="7" maxlength="10000"></textarea><div class="form-text">Up to 10,000 characters.</div></div>
-<div class="mb-3"><label asp-for="Keywords" class="form-label"></label><input asp-for="Keywords" class="form-control" maxlength="1000" /><div class="form-text">For example: databases, education, web applications.</div></div>
+else { <div class="mb-3"><label asp-for="ProjectType" class="form-label"></label><select asp-for="ProjectType" asp-items="Html.GetEnumSelectList<ProjectType>()" class="form-select"><option value="">Select a project type</option></select><span asp-validation-for="ProjectType" class="field-validation-error"></span></div> }
+<div class="mb-3"><label asp-for="Title" class="form-label"></label><input asp-for="Title" class="form-control" maxlength="250" /><span asp-validation-for="Title" class="field-validation-error"></span></div>
+<div class="mb-3"><label asp-for="Abstract" class="form-label"></label><textarea asp-for="Abstract" class="form-control" rows="7" maxlength="10000"></textarea><div class="form-text">Up to 10,000 characters.</div><span asp-validation-for="Abstract" class="field-validation-error"></span></div>
+<div class="mb-3"><label asp-for="Keywords" class="form-label"></label><input asp-for="Keywords" class="form-control" maxlength="1000" /><div class="form-text">For example: databases, education, web applications.</div><span asp-validation-for="Keywords" class="field-validation-error"></span></div>
 <div class="row">
-<div class="col-md-6 mb-3"><label asp-for="SupervisorName" class="form-label"></label><input asp-for="SupervisorName" class="form-control" maxlength="150" /></div>
-<div class="col-md-6 mb-3"><label asp-for="CourseName" class="form-label"></label><input asp-for="CourseName" class="form-control" maxlength="150" /></div>
-<div class="col-md-4 mb-3"><label asp-for="CourseCode" class="form-label"></label><input asp-for="CourseCode" class="form-control" maxlength="30" /></div>
-<div class="col-md-4 mb-3"><label asp-for="AcademicYear" class="form-label"></label><input asp-for="AcademicYear" class="form-control" maxlength="30" /></div>
-<div class="col-md-4 mb-3"><label asp-for="Semester" class="form-label"></label><input asp-for="Semester" class="form-control" maxlength="50" /></div>
+<div class="col-md-6 mb-3"><label asp-for="SupervisorName" class="form-label"></label><input asp-for="SupervisorName" class="form-control" maxlength="150" /><span asp-validation-for="SupervisorName" class="field-validation-error"></span></div>
+<div class="col-md-6 mb-3"><label asp-for="CourseName" class="form-label"></label><input asp-for="CourseName" class="form-control" maxlength="150" /><span asp-validation-for="CourseName" class="field-validation-error"></span></div>
+<div class="col-md-4 mb-3"><label asp-for="CourseCode" class="form-label"></label><input asp-for="CourseCode" class="form-control" maxlength="30" /><span asp-validation-for="CourseCode" class="field-validation-error"></span></div>
+<div class="col-md-4 mb-3"><label asp-for="AcademicYear" class="form-label"></label><input asp-for="AcademicYear" class="form-control" maxlength="30" /><span asp-validation-for="AcademicYear" class="field-validation-error"></span></div>
+<div class="col-md-4 mb-3"><label asp-for="Semester" class="form-label"></label><input asp-for="Semester" class="form-control" maxlength="50" /><span asp-validation-for="Semester" class="field-validation-error"></span></div>
 </div>

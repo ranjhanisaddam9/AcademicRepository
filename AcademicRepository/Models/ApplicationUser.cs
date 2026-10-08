@@ -10,4 +10,5 @@ public class ApplicationUser : IdentityUser
     public Department? Department { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
+    public byte[] RowVersion { get; set; } = [];
 }

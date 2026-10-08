@@ -5,7 +5,7 @@
 }
 else
 {
-    <div class="table-responsive" tabindex="0" aria-label="Scrollable results table">
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Scrollable results table">
         <table class="table table-striped table-hover align-middle">
             <thead><tr>
                 @foreach (var column in Model.Columns)
@@ -30,7 +30,11 @@ else
                         {
                             <td>@if (cell.BadgeClass is not null) { <span class="badge @cell.BadgeClass">@cell.Text</span> } else { @cell.Text }</td>
                         }
-                        @if (row.Actions.Count > 0) { <td><partial name="_ActionMenu" model="row.Actions" /></td> }
+                        @if (row.Actions.Count > 0)
+                        {
+                            var actionMenuViewData = new ViewDataDictionary(ViewData) { ["ContextLabel"] = row.Cells.FirstOrDefault()?.Text ?? "record" };
+                            <td><partial name="_ActionMenu" model="row.Actions" view-data="actionMenuViewData" /></td>
+                        }
                     </tr>
                 }
             </tbody>

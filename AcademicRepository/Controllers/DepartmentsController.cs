@@ -61,7 +61,7 @@ public class DepartmentsController(ApplicationDbContext db, ILogger<DepartmentsC
     {
         var department = await db.Departments.FindAsync(id);
         if (department is null) return NotFound();
-        return View("Form", new DepartmentFormViewModel { Name = department.Name, Code = department.Code, StudentEmailKeyword = department.StudentEmailKeyword ?? "" });
+        return View("Form", new DepartmentFormViewModel { Name = department.Name, Code = department.Code, StudentEmailKeyword = department.StudentEmailKeyword ?? "", RowVersion = department.RowVersion });
     }
 
     [HttpPost]
@@ -69,15 +69,18 @@ public class DepartmentsController(ApplicationDbContext db, ILogger<DepartmentsC
     {
         var department = await db.Departments.FindAsync(id);
         if (department is null) return NotFound();
+        if (model.RowVersion is null || model.RowVersion.Length == 0)
+            ModelState.AddModelError("", "This department was changed by another administrator. Please refresh and try again.");
         // Preserve a current Student email mapping when older/manual clients omit this field.
         model.StudentEmailKeyword ??= department.StudentEmailKeyword;
         await ValidateAsync(model, id);
         if (!ModelState.IsValid) return View("Form", model);
+        db.Entry(department).Property(d => d.RowVersion).OriginalValue = model.RowVersion!;
         department.Name = model.Name;
         department.Code = model.Code;
         department.StudentEmailKeyword = string.IsNullOrWhiteSpace(model.StudentEmailKeyword) ? null : model.StudentEmailKeyword;
         department.UpdatedAt = DateTime.UtcNow;
-        if (!await SaveAsync()) return View("Form", model);
+        if (!await SaveAsync(department)) return View("Form", model);
         TempData["Status"] = "Department updated.";
         return RedirectToAction(nameof(Index));
     }
@@ -112,9 +115,20 @@ public class DepartmentsController(ApplicationDbContext db, ILogger<DepartmentsC
             ModelState.AddModelError(nameof(model.StudentEmailKeyword), "This Student email code is already assigned to a department.");
     }
 
-    private async Task<bool> SaveAsync()
+    private async Task<bool> SaveAsync(Department? department = null)
     {
         try { await db.SaveChangesAsync(); return true; }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            logger.LogWarning(exception, "Department concurrency conflict. DepartmentId={DepartmentId} Result={Result}", department?.Id, "Conflict");
+            ModelState.AddModelError("", "This record was changed by another user. Please refresh and try again.");
+            if (department is not null)
+            {
+                var entry = db.Entry(department);
+                await entry.ReloadAsync();
+            }
+            return false;
+        }
         catch (DbUpdateException exception)
         {
             logger.LogWarning(exception, "Department update failed.");

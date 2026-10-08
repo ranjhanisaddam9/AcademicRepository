@@ -1,7 +1,7 @@
 @model OperationalSettingsViewModel
 @{ ViewData["Title"] = "Operational Settings"; }
 <h1>Operational settings</h1><p>Validated values apply at runtime. Secrets and infrastructure credentials are managed through deployment configuration and cannot be changed here.</p>
-<form asp-action="Settings" method="post"><div asp-validation-summary="ModelOnly" class="text-danger"></div>
+<form asp-action="Settings" method="post"><div asp-validation-summary="ModelOnly" class="text-danger"></div><input asp-for="ConcurrencyToken" type="hidden" />
 <div class="mb-3"><label asp-for="ApplicationDisplayName" class="form-label"></label><input asp-for="ApplicationDisplayName" class="form-control" /><span asp-validation-for="ApplicationDisplayName" class="text-danger"></span></div>
 <div class="mb-3"><label asp-for="SupportEmail" class="form-label"></label><input asp-for="SupportEmail" class="form-control" /><span asp-validation-for="SupportEmail" class="text-danger"></span></div>
 <div class="mb-3"><label asp-for="DefaultAcademicYear" class="form-label"></label><input asp-for="DefaultAcademicYear" class="form-control" /><span asp-validation-for="DefaultAcademicYear" class="text-danger"></span></div>

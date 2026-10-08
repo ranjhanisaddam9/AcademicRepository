@@ -13,7 +13,7 @@
 </div>
 @if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Approved records with incomplete review or version data have been withheld from repository statistics and reports. Resource availability is checked when a project is opened or downloaded.</p> }
 <a class="btn btn-primary mb-3" asp-action="Repository">Academic Repository</a> <a class="btn btn-outline-primary mb-3" asp-action="Reports">Reports</a>
-<section class="section-card mb-4"><h2 class="h4">Approved Projects by Department</h2><div class="table-responsive" tabindex="0" role="region" aria-label="Approved projects by department"><table class="table"><thead><tr><th>Department</th><th>Approved Projects</th></tr></thead><tbody>
+<section class="section-card mb-4"><h2 class="h4">Approved Projects by Department</h2><div class="table-responsive" tabindex="0" role="region" aria-label="Approved projects by department"><table class="table"><thead><tr><th scope="col">Department</th><th scope="col">Approved Projects</th></tr></thead><tbody>
 @foreach (var department in Model.Departments) { <tr><td>@department.Department</td><td>@department.Total</td></tr> }
 </tbody></table></div><partial name="_Pagination" model="departmentPagination" /></section>
 <h2 class="h4 mb-3">Recent Approvals</h2>

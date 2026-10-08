@@ -24,8 +24,8 @@
 @if (Model.Files.Count == 0) { <p class="alert alert-warning">No resources are attached to this legacy submission.</p> }
 else
 {
-<div class="table-responsive" tabindex="0" role="region" aria-label="Submission files"><table class="table"><thead><tr><th>File</th><th>Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th>Action</th></tr></thead><tbody>
-@foreach (var file in Model.Files) { <tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td><a asp-action="Download" asp-route-id="@file.Id">Download</a></td></tr> }
+<div class="table-responsive" tabindex="0" role="region" aria-label="Submission files"><table class="table"><thead><tr><th scope="col">File</th><th scope="col">Type</th><th scope="col">Description</th><th scope="col">Size</th><th scope="col">Uploaded (UTC)</th><th scope="col">Action</th></tr></thead><tbody>
+@foreach (var file in Model.Files) { <tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td><a asp-action="Download" asp-route-id="@file.Id" data-loading-link data-loading-text="Starting download…">Download</a></td></tr> }
 </tbody></table></div>
 }
 </section>
@@ -34,16 +34,17 @@ else
 @if (Model.WorkflowMessage is not null) { <p class="alert alert-warning">@Model.WorkflowMessage</p> }
 @if (Model.CanStart)
 {
-<form asp-action="StartReview" asp-route-id="@Model.Project.Id" method="post"><button class="btn btn-primary" type="submit">Start Review</button></form>
+<form asp-action="StartReview" asp-route-id="@Model.Project.Id" method="post"><button class="btn btn-primary" type="submit" data-loading-text="Starting review…">Start Review</button></form>
 }
 @if (Model.CanComplete)
 {
 <form asp-action="Approve" asp-route-id="@Model.Project.Id" method="post" style="max-width:850px">
 <input type="hidden" name="ReviewId" value="@Model.ActiveReviewId" />
 <label for="review-comments" class="form-label">Comments (required for rejection)</label>
-<textarea id="review-comments" name="Comments" maxlength="2000" class="form-control mb-3" rows="4">@ViewData["Comments"]</textarea>
-<button class="btn btn-success" type="submit">Approve</button>
-<button class="btn btn-danger" type="submit" asp-action="Reject" asp-route-id="@Model.Project.Id">Reject</button>
+<textarea id="review-comments" name="Comments" maxlength="2000" class="form-control mb-3" rows="4" aria-describedby="review-comments-help review-comments-validation">@ViewData["Comments"]</textarea>
+<div id="review-comments-help" class="form-text">Comments are required when rejecting a submission.</div><span id="review-comments-validation" class="field-validation-valid" data-valmsg-for="Comments"></span>
+<button class="btn btn-success" type="submit" data-loading-text="Approving…">Approve</button>
+<button class="btn btn-danger" type="submit" asp-action="Reject" asp-route-id="@Model.Project.Id" data-confirm="Reject this submission? The review comments will be shared with the Student." data-loading-text="Rejecting…">Reject</button>
 </form>
 }
 </section>

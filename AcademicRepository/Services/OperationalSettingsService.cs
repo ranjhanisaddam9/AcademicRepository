@@ -4,6 +4,7 @@ using AcademicRepository.Data;
 using AcademicRepository.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace AcademicRepository.Services;
 
@@ -14,7 +15,8 @@ public interface IOperationalSettingsService
 }
 
 public sealed class OperationalSettingsService(ApplicationDbContext db, IConfiguration configuration,
-    IOptions<FileStorageOptions> files, IOptions<AuthenticationCodeOptions> otp, TimeProvider clock) : IOperationalSettingsService
+    IOptions<FileStorageOptions> files, IOptions<AuthenticationCodeOptions> otp, TimeProvider clock,
+    ILogger<OperationalSettingsService> logger) : IOperationalSettingsService
 {
     private static readonly (string Key, string Description)[] Descriptions =
     [
@@ -58,7 +60,9 @@ public sealed class OperationalSettingsService(ApplicationDbContext db, IConfigu
             ApplicationDisplayName = Get("ApplicationDisplayName", configuration["Application:DisplayName"] ?? "Academic Project Repository"),
             SupportEmail = NullIfBlank(Get("SupportEmail", configuration["Application:SupportEmail"] ?? "")),
             UpdatedAt = rows.Max(s => (DateTime?)s.UpdatedAt),
-            UpdatedBy = rows.SingleOrDefault(s => s.Key == "ApplicationDisplayName")?.UpdatedBy
+            UpdatedBy = rows.SingleOrDefault(s => s.Key == "ApplicationDisplayName")?.UpdatedBy,
+            ConcurrencyToken = JsonSerializer.Serialize(await db.SystemSettings.AsNoTracking()
+                .ToDictionaryAsync(s => s.Key, s => Convert.ToBase64String(s.RowVersion), StringComparer.OrdinalIgnoreCase, cancellationToken))
         };
         ValidatePersisted(model);
         return model;
@@ -87,7 +91,18 @@ public sealed class OperationalSettingsService(ApplicationDbContext db, IConfigu
             ["ApplicationDisplayName"] = (value.ApplicationDisplayName, "String"),
             ["SupportEmail"] = (value.SupportEmail ?? "", "String")
         };
+        Dictionary<string, string> expected;
+        try { expected = JsonSerializer.Deserialize<Dictionary<string, string>>(value.ConcurrencyToken ?? "") ?? new(StringComparer.OrdinalIgnoreCase); }
+        catch (JsonException) { throw new StaleDataConflictException(); }
         var entries = await db.SystemSettings.ToDictionaryAsync(s => s.Key, StringComparer.OrdinalIgnoreCase, cancellationToken);
+        foreach (var (key, entry) in entries)
+        {
+            if (!expected.TryGetValue(key, out var token)) throw new StaleDataConflictException();
+            byte[] original;
+            try { original = Convert.FromBase64String(token); }
+            catch (FormatException) { throw new StaleDataConflictException(); }
+            db.Entry(entry).Property(s => s.RowVersion).OriginalValue = original;
+        }
         var now = clock.GetUtcNow().UtcDateTime;
         foreach (var (key, (settingValue, type)) in supplied)
         {
@@ -102,7 +117,17 @@ public sealed class OperationalSettingsService(ApplicationDbContext db, IConfigu
             entry.UpdatedAt = now;
             entry.UpdatedByUserId = updatedBy;
         }
-        await db.SaveChangesAsync(cancellationToken);
+        try { await db.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            logger.LogWarning(exception, "Operational settings concurrency conflict. UpdatedByUserId={UserId} Result={Result}", updatedBy, "Conflict");
+            throw new StaleDataConflictException();
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is Microsoft.Data.SqlClient.SqlException { Number: 2601 or 2627 })
+        {
+            logger.LogWarning(exception, "Operational settings insert race. UpdatedByUserId={UserId} Result={Result}", updatedBy, "Conflict");
+            throw new StaleDataConflictException();
+        }
     }
 
     private static string Format(int value) => value.ToString(CultureInfo.InvariantCulture);
@@ -118,3 +143,5 @@ public sealed class OperationalSettingsService(ApplicationDbContext db, IConfigu
             throw new InvalidOperationException("SupportEmail must be a valid @smiu.edu.pk address.");
     }
 }
+
+public sealed class StaleDataConflictException() : Exception("This record was changed by another user. Please refresh and try again.");

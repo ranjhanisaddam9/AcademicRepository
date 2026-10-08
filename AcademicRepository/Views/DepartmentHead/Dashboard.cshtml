@@ -13,9 +13,9 @@
 @if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Some approved records have incomplete review or version data and are withheld from repository views.</p> }
 <section id="insights" class="section-card mb-4"><h2 class="h4">Repository Insights</h2>
 <p class="text-muted">Counts include approved records with valid submitted-version and resource snapshots. Physical resource availability is checked when repository entries are displayed or downloaded.</p>
-<div class="row g-3"><div class="col-lg-6"><h3 class="h5">Approved Projects by Academic Year</h3><div class="table-responsive" tabindex="0" role="region" aria-label="Approved projects by academic year"><table class="table"><thead><tr><th>Academic Year</th><th>Approved Projects</th></tr></thead><tbody>
+<div class="row g-3"><div class="col-lg-6"><h3 class="h5">Approved Projects by Academic Year</h3><div class="table-responsive" tabindex="0" role="region" aria-label="Approved projects by academic year"><table class="table"><thead><tr><th scope="col">Academic Year</th><th scope="col">Approved Projects</th></tr></thead><tbody>
 @foreach (var group in Model.AcademicYears) { <tr><td>@group.Label</td><td>@group.Count</td></tr> }
-</tbody></table></div></div><div class="col-lg-6"><h3 class="h5">Approved Projects by Semester</h3><div class="table-responsive" tabindex="0" role="region" aria-label="Approved projects by semester"><table class="table"><thead><tr><th>Semester</th><th>Approved Projects</th></tr></thead><tbody>
+</tbody></table></div></div><div class="col-lg-6"><h3 class="h5">Approved Projects by Semester</h3><div class="table-responsive" tabindex="0" role="region" aria-label="Approved projects by semester"><table class="table"><thead><tr><th scope="col">Semester</th><th scope="col">Approved Projects</th></tr></thead><tbody>
 @foreach (var group in Model.Semesters) { <tr><td>@group.Label</td><td>@group.Count</td></tr> }
 </tbody></table></div></div></div></section>
 <h2 class="h4 mb-3">Recent Approved Projects</h2>

@@ -193,7 +193,7 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
         return View("Message", "An active student account with an assigned department is required to create submissions. Contact your administrator.");
     }
     private IActionResult Locked() => ConflictView("Only Draft or Revision submissions can be edited; only initial drafts can be deleted.");
-    private IActionResult Changed() => ConflictView("This draft changed or was deleted while the page was open. Return to My Submissions and reload before continuing.");
+    private IActionResult Changed() => ConflictView("This record was changed by another user. Please refresh and try again.");
     private IActionResult NotFoundAccess(int id, string action)
     {
         logger.LogWarning("Student resource access unavailable. Action={Action} UserId={UserId} SubmissionId={SubmissionId} Result={Result}", action, StudentId, id, "NotFound");

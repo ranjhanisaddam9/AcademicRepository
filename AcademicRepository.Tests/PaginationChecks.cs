@@ -1,5 +1,6 @@
 using AcademicRepository.Data;
 using AcademicRepository.Models;
+using AcademicRepository.Services;
 using Microsoft.EntityFrameworkCore;
 
 internal static partial class IntegrationChecks
@@ -37,5 +38,25 @@ internal static partial class IntegrationChecks
         var offset = sql.IndexOf("OFFSET", StringComparison.OrdinalIgnoreCase);
         Check(where >= 0 && orderBy > where && offset > orderBy && sql.Contains("FETCH NEXT", StringComparison.OrdinalIgnoreCase),
             "EF Core emits scoped filtering and ordering before SQL OFFSET/FETCH pagination");
+
+        var sameDay = new RepositoryFilterViewModel { ApprovedFrom = new DateOnly(2026, 10, 8), ApprovedTo = new DateOnly(2026, 10, 8) };
+        Check(sameDay.HasValidApprovalDateRange
+            && !new RepositoryFilterViewModel { ApprovedFrom = new DateOnly(2026, 10, 9), ApprovedTo = new DateOnly(2026, 10, 8) }.HasValidApprovalDateRange
+            && !new RepositoryFilterViewModel { ApprovedTo = DateOnly.MaxValue }.HasValidApprovalDateRange,
+            "Repository approval date range accepts same-day ranges and rejects reversed or overflowing ranges");
+
+        var approvedRangeSql = RepositoryService.ApplyApprovalDateFilter(db.SubmissionReviews.AsNoTracking(), sameDay).ToQueryString();
+        Check(approvedRangeSql.Contains("CompletedAt", StringComparison.OrdinalIgnoreCase)
+            && approvedRangeSql.Contains(">=", StringComparison.Ordinal)
+            && approvedRangeSql.Contains("<", StringComparison.Ordinal),
+            "Repository approval-date filtering uses inclusive UTC day boundaries in SQL");
+
+        var scoped = new RepositoryScope("CSC Repository", "coordinator-id", 42, true);
+        var tamperedDepartmentSql = RepositoryService.ApplyFilters(
+            db.SubmissionReviews.AsNoTracking().Where(r => r.ProjectSubmission.DepartmentId == scoped.DepartmentId), scoped,
+            new RepositoryFilterViewModel { DepartmentId = 99 }).ToQueryString();
+        Check(tamperedDepartmentSql.Contains("DepartmentId", StringComparison.OrdinalIgnoreCase)
+            && !tamperedDepartmentSql.Contains("99", StringComparison.Ordinal),
+            "A query-string department filter cannot override an already authorized Coordinator department scope");
     }
 }

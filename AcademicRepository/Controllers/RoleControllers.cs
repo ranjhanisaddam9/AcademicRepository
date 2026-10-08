@@ -44,5 +44,11 @@ public class AdminController(IAdminSystemService system, IOperationalSettingsSer
             ModelState.AddModelError("", ex.Message);
             return View("~/Views/Home/Settings.cshtml", model);
         }
+        catch (StaleDataConflictException ex)
+        {
+            Response.StatusCode = StatusCodes.Status409Conflict;
+            ModelState.AddModelError("", ex.Message);
+            return View("~/Views/Home/Settings.cshtml", model);
+        }
     }
 }

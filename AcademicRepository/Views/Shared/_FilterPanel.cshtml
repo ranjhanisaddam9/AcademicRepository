@@ -22,7 +22,7 @@
             {
                 var id = $"filter-{field.Name}";
                 <label for="@id" class="form-label">@field.Label</label>
-                <input id="@id" name="@field.Name" value="@field.Value" maxlength="@field.MaxLength" placeholder="@field.Placeholder" class="form-control" />
+                <input id="@id" name="@field.Name" value="@field.Value" type="@field.Type" maxlength="@field.MaxLength" placeholder="@field.Placeholder" class="form-control" />
             }
         </div>
     }

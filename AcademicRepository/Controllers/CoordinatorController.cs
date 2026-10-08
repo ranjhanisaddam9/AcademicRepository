@@ -49,6 +49,8 @@ public sealed class CoordinatorController(IReviewService reviews, UserManager<Ap
             // Re-authorize before rendering any details after a validation failure.
             var details = await reviews.GetSubmissionForReviewAsync(UserId, id);
             ModelState.AddModelError("", ex.Message);
+            if (ex.Message.StartsWith("Rejection requires comments", StringComparison.Ordinal))
+                ModelState.AddModelError(nameof(ReviewDecisionViewModel.Comments), ex.Message);
             ViewData["Comments"] = model.Comments;
             Response.StatusCode = 400;
             return View("Review", details);

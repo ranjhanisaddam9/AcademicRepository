@@ -47,7 +47,7 @@ public sealed class SubmissionWorkflowService(ApplicationDbContext db, UserManag
         catch (DbUpdateException exception)
         {
             logger.LogWarning(exception, "Revision start conflicted. Action={Action} UserId={UserId} SubmissionId={SubmissionId} Result={Result}", "RevisionStarted", userId, id, "Conflict");
-            throw new ReviewOperationException(409, "The submission changed. Reload before starting revision.");
+            throw new ReviewOperationException(409, "This record was changed by another user. Please refresh and try again.");
         }
         logger.LogInformation("Submission lifecycle event. Action={Action} UserId={UserId} Role={Role} DepartmentId={DepartmentId} SubmissionId={SubmissionId} Result={Result}",
             "RevisionStarted", userId, "Student", user.DepartmentId, id, "Revision");

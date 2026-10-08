@@ -46,7 +46,7 @@
     {
         <a class="app-brand" asp-controller="Account" asp-action="Login" aria-label="@applicationName sign in"><span class="brand-mark" aria-hidden="true">A</span><span class="brand-name">@applicationName</span></a>
     }
-    <div class="header-context" aria-label="Current page"><span class="context-divider">/</span><span>@currentPage</span></div>
+    <div class="header-context" aria-label="Current page"><span class="context-divider" aria-hidden="true">/</span><span>@currentPage</span></div>
     @if (User.Identity?.IsAuthenticated == true)
     {
         <details class="user-menu">
@@ -81,49 +81,49 @@
             {
                 <div class="nav-section-label">Administration</div>
                 <nav class="side-nav" aria-label="Administration">
-                    <a class="side-link @(controller == "Admin" && action == "Dashboard" ? "active" : "")" asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
-                    <a class="side-link @(controller == "Users" ? "active" : "")" asp-controller="Users" asp-action="Index"><span class="nav-icon">♙</span>Users</a>
-                    <a class="side-link @(controller == "Departments" ? "active" : "")" asp-controller="Departments" asp-action="Index"><span class="nav-icon">⌂</span>Departments</a>
-                    <a class="side-link @(controller == "Admin" && action == "Settings" ? "active" : "")" asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙</span>System Configuration</a>
-                    <a class="side-link @(controller == "Admin" && action == "Diagnostics" ? "active" : "")" asp-controller="Admin" asp-action="Diagnostics"><span class="nav-icon">⌁</span>System Diagnostics</a>
-                    <a class="side-link @(controller == "Admin" && action == "SystemInformation" ? "active" : "")" asp-controller="Admin" asp-action="SystemInformation"><span class="nav-icon">ⓘ</span>System Information</a>
-                    <a class="side-link @(controller == "Admin" && action == "Overview" ? "active" : "")" asp-controller="Admin" asp-action="Overview"><span class="nav-icon">◷</span>Operations Overview</a>
+                    <a class="side-link @(controller == "Admin" && action == "Dashboard" ? "active" : "")" asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "Users" ? "active" : "")" asp-controller="Users" asp-action="Index"><span class="nav-icon" aria-hidden="true">♙</span>Users</a>
+                    <a class="side-link @(controller == "Departments" ? "active" : "")" asp-controller="Departments" asp-action="Index"><span class="nav-icon" aria-hidden="true">⌂</span>Departments</a>
+                    <a class="side-link @(controller == "Admin" && action == "Settings" ? "active" : "")" asp-controller="Admin" asp-action="Settings"><span class="nav-icon" aria-hidden="true">⚙</span>System Configuration</a>
+                    <a class="side-link @(controller == "Admin" && action == "Diagnostics" ? "active" : "")" asp-controller="Admin" asp-action="Diagnostics"><span class="nav-icon" aria-hidden="true">⌁</span>System Diagnostics</a>
+                    <a class="side-link @(controller == "Admin" && action == "SystemInformation" ? "active" : "")" asp-controller="Admin" asp-action="SystemInformation"><span class="nav-icon" aria-hidden="true">ⓘ</span>System Information</a>
+                    <a class="side-link @(controller == "Admin" && action == "Overview" ? "active" : "")" asp-controller="Admin" asp-action="Overview"><span class="nav-icon" aria-hidden="true">◷</span>Operations Overview</a>
                 </nav>
             }
             @if (User.IsInRole("Student"))
             {
                 <div class="nav-section-label">Student</div>
                 <nav class="side-nav" aria-label="Student">
-                    <a class="side-link @(controller == "Student" ? "active" : "")" asp-controller="Student" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
-                    <a class="side-link @(controller == "StudentSubmissions" ? "active" : "")" asp-controller="StudentSubmissions" asp-action="Index"><span class="nav-icon">▤</span>My Submissions</a>
-                    <a class="side-link @(controller == "Repository" ? "active" : "")" asp-controller="Repository" asp-action="Index"><span class="nav-icon">◫</span>My Repository</a>
+                    <a class="side-link @(controller == "Student" ? "active" : "")" asp-controller="Student" asp-action="Dashboard"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "StudentSubmissions" ? "active" : "")" asp-controller="StudentSubmissions" asp-action="Index"><span class="nav-icon" aria-hidden="true">▤</span>My Submissions</a>
+                    <a class="side-link @(controller == "Repository" ? "active" : "")" asp-controller="Repository" asp-action="Index"><span class="nav-icon" aria-hidden="true">◫</span>My Repository</a>
                 </nav>
             }
             @if (User.IsInRole("Coordinator"))
             {
                 <div class="nav-section-label">Department</div>
                 <nav class="side-nav" aria-label="Coordinator">
-                    <a class="side-link @(controller == "Coordinator" && action == "Dashboard" ? "active" : "")" asp-controller="Coordinator" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
-                    <a class="side-link @(controller == "Coordinator" && (action == "ReviewQueue" || action == "Review") ? "active" : "")" asp-controller="Coordinator" asp-action="ReviewQueue"><span class="nav-icon">☷</span>Review Queue</a>
-                    <a class="side-link @(controller == "Repository" ? "active" : "")" asp-controller="Repository" asp-action="Index"><span class="nav-icon">◫</span>My Department Repository</a>
+                    <a class="side-link @(controller == "Coordinator" && action == "Dashboard" ? "active" : "")" asp-controller="Coordinator" asp-action="Dashboard"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "Coordinator" && (action == "ReviewQueue" || action == "Review") ? "active" : "")" asp-controller="Coordinator" asp-action="ReviewQueue"><span class="nav-icon" aria-hidden="true">☷</span>Review Queue</a>
+                    <a class="side-link @(controller == "Repository" ? "active" : "")" asp-controller="Repository" asp-action="Index"><span class="nav-icon" aria-hidden="true">◫</span>My Department Repository</a>
                 </nav>
             }
             @if (User.IsInRole("DepartmentHead"))
             {
                 <div class="nav-section-label">Department</div>
                 <nav class="side-nav" aria-label="Department head">
-                    <a class="side-link @(controller == "DepartmentHead" && action == "Dashboard" ? "active" : "")" asp-controller="DepartmentHead" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
-                    <a class="side-link @(controller == "DepartmentHead" && action == "Repository" || controller == "Repository" ? "active" : "")" asp-controller="DepartmentHead" asp-action="Repository"><span class="nav-icon">◫</span>Academic Repository</a>
-                    <a class="side-link" asp-controller="DepartmentHead" asp-action="Dashboard" asp-fragment="insights"><span class="nav-icon">▥</span>Insights</a>
+                    <a class="side-link @(controller == "DepartmentHead" && action == "Dashboard" ? "active" : "")" asp-controller="DepartmentHead" asp-action="Dashboard"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "DepartmentHead" && action == "Repository" || controller == "Repository" ? "active" : "")" asp-controller="DepartmentHead" asp-action="Repository"><span class="nav-icon" aria-hidden="true">◫</span>Academic Repository</a>
+                    <a class="side-link" asp-controller="DepartmentHead" asp-action="Dashboard" asp-fragment="insights"><span class="nav-icon" aria-hidden="true">▥</span>Insights</a>
                 </nav>
             }
             @if (User.IsInRole("ORICQEC"))
             {
                 <div class="nav-section-label">Institution</div>
                 <nav class="side-nav" aria-label="ORIC / QEC">
-                    <a class="side-link @(controller == "ORICQEC" && action == "Dashboard" ? "active" : "")" asp-controller="ORICQEC" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
-                    <a class="side-link @(controller == "ORICQEC" && (action == "Repository" || action == "Details") ? "active" : "")" asp-controller="ORICQEC" asp-action="Repository"><span class="nav-icon">◫</span>Academic Repository</a>
-                    <a class="side-link @(controller == "ORICQEC" && action == "Reports" ? "active" : "")" asp-controller="ORICQEC" asp-action="Reports"><span class="nav-icon">▥</span>Reports</a>
+                    <a class="side-link @(controller == "ORICQEC" && action == "Dashboard" ? "active" : "")" asp-controller="ORICQEC" asp-action="Dashboard"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "ORICQEC" && (action == "Repository" || action == "Details") ? "active" : "")" asp-controller="ORICQEC" asp-action="Repository"><span class="nav-icon" aria-hidden="true">◫</span>Academic Repository</a>
+                    <a class="side-link @(controller == "ORICQEC" && action == "Reports" ? "active" : "")" asp-controller="ORICQEC" asp-action="Reports"><span class="nav-icon" aria-hidden="true">▥</span>Reports</a>
                 </nav>
             }
             @if (!string.IsNullOrWhiteSpace(supportEmail))
@@ -138,8 +138,7 @@
             {
                 <nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-controller="@dashboardController" asp-action="Dashboard">Home</a><span aria-hidden="true">›</span><span aria-current="page">@currentPage</span></nav>
             }
-            @if (TempData["Status"] is string status) { <div class="alert alert-success" role="status"><strong>Success</strong><span>@status</span></div> }
-            @if (TempData["Error"] is string error) { <div class="alert alert-danger" role="alert"><strong>Something needs attention</strong><span>@error</span></div> }
+            <partial name="_ToastContainer" />
             @RenderBody()
         </div>
         @if (!string.IsNullOrWhiteSpace(supportEmail))
@@ -148,6 +147,7 @@
         }
     </main>
 </div>
+<partial name="_ConfirmDialog" />
 <script src="~/js/site.js" asp-append-version="true" defer></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>

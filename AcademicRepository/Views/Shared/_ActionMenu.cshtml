@@ -1,19 +1,20 @@
 @model IReadOnlyList<DataTableActionViewModel>
+@{ var contextLabel = ViewData["ContextLabel"]?.ToString(); var rowActionsLabel = string.IsNullOrWhiteSpace(contextLabel) ? "Row actions" : $"Actions for {contextLabel}"; var singleActionLabel = string.IsNullOrWhiteSpace(contextLabel) ? Model[0].Label : $"{Model[0].Label} for {contextLabel}"; }
 @if (Model.Count == 1)
 {
     @if (Model[0].IsPost)
     {
         <form asp-controller="@Model[0].Controller" asp-action="@Model[0].Action" asp-route-id="@Model[0].RouteId" method="post" class="d-inline">
             @if (Model[0].HiddenName is not null) { <input type="hidden" name="@Model[0].HiddenName" value="@Model[0].HiddenValue" /> }
-            <button class="@Model[0].CssClass" type="submit">@Model[0].Label</button>
+            <button class="@Model[0].CssClass" type="submit" aria-label="@singleActionLabel" data-confirm="@(Model[0].Label == "Deactivate" ? "Deactivate this account or department?" : null)">@Model[0].Label</button>
         </form>
     }
     else { <a class="@Model[0].CssClass" href="@Model[0].Url">@Model[0].Label</a> }
 }
 else if (Model.Count > 1)
 {
-    <div class="dropdown">
-        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button>
+    <details class="dropdown action-menu">
+        <summary class="btn btn-sm btn-outline-secondary dropdown-toggle" aria-label="@rowActionsLabel">Actions</summary>
         <ul class="dropdown-menu dropdown-menu-end">
             @foreach (var action in Model)
             {
@@ -22,12 +23,12 @@ else if (Model.Count > 1)
                     {
                         <form asp-controller="@action.Controller" asp-action="@action.Action" asp-route-id="@action.RouteId" method="post" class="px-2">
                             @if (action.HiddenName is not null) { <input type="hidden" name="@action.HiddenName" value="@action.HiddenValue" /> }
-                            <button class="@action.CssClass" type="submit">@action.Label</button>
+                            <button class="@action.CssClass" type="submit" data-confirm="@(action.Label == "Deactivate" ? "Deactivate this account or department? Existing records will be retained." : null)">@action.Label</button>
                         </form>
                     }
                     else { <a class="@action.CssClass" href="@action.Url">@action.Label</a> }
                 </li>
             }
         </ul>
-    </div>
+    </details>
 }

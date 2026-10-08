@@ -20,6 +20,8 @@ if (args is ["--email-only"]) { await Office365EmailChecks(); return; }
 if (args is ["--pagination-only"]) { PaginationOnly(); return; }
 if (args is ["--errors-only"]) { await ErrorHandlingChecks(); return; }
 if (args is ["--security-only"]) { await SecurityChecks(); return; }
+if (args is ["--accessibility-only"]) { AccessibilityChecks(); return; }
+if (args is ["--concurrency-only"]) { ConcurrencyChecks.Run(); return; }
 await Office365EmailChecks();
 await MigrationUpgradeChecks();
 // Real SQL Server integration checks. Credentials are generated for this run only.

@@ -17,8 +17,8 @@
 <dt class="col-sm-3">Semester</dt><dd class="col-sm-9">@Model.Project.Semester</dd>
 </dl>
 <h2>Files submitted</h2>
-<div class="table-responsive" tabindex="0" role="region" aria-label="Submitted version files"><table class="table"><thead><tr><th>File</th><th>Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th></th></tr></thead><tbody>
-@foreach (var file in Model.Files) { <tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td><a asp-action="Download" asp-route-id="@Model.Id" asp-route-fileId="@file.Id">Download</a></td></tr> }
+<div class="table-responsive" tabindex="0" role="region" aria-label="Submitted version files"><table class="table"><thead><tr><th scope="col">File</th><th scope="col">Type</th><th scope="col">Description</th><th scope="col">Size</th><th scope="col">Uploaded (UTC)</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead><tbody>
+@foreach (var file in Model.Files) { <tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td><a asp-action="Download" asp-route-id="@Model.Id" asp-route-fileId="@file.Id" data-loading-link data-loading-text="Starting download…">Download</a></td></tr> }
 </tbody></table></div>
 <partial name="_ReviewHistory" model="Model.Reviews" />
 @if (User.IsInRole("Coordinator")) { <a asp-controller="Coordinator" asp-action="ReviewQueue">Back to Review Queue</a> }

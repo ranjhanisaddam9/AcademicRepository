@@ -5,5 +5,5 @@
 <div class="alert alert-warning">Delete the draft “@Model.Title”? This permanently removes the draft and cannot be undone.</div>
 <form asp-action="Delete" asp-route-id="@ViewContext.RouteData.Values["id"]" method="post">
 <input asp-for="EditToken" type="hidden" />
-<button class="btn btn-danger" type="submit">Confirm Delete</button> <a class="btn btn-secondary" asp-action="Index">Cancel</a>
+<button class="btn btn-danger" type="submit" data-confirm="Permanently delete this draft? This cannot be undone." data-loading-text="Deleting draft…">Confirm Delete</button> <a class="btn btn-secondary" asp-action="Index">Cancel</a>
 </form>

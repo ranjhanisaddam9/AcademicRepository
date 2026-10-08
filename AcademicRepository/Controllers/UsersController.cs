@@ -109,7 +109,7 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
         {
             FullName = user.FullName, Email = user.Email ?? "", DepartmentId = user.DepartmentId,
             Role = (await users.GetRolesAsync(user)).FirstOrDefault(r => IdentitySeeder.Roles.Contains(r)) ?? "",
-            EditToken = editProtector.Protect(user.Id + "\n" + user.ConcurrencyStamp)
+            EditToken = editProtector.Protect(UserEditValue(user))
         };
         await PopulateDepartmentsAsync(model, user.DepartmentId);
         return View("Form", model);
@@ -274,6 +274,12 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
 
     private bool Accept(IdentityResult result)
     {
+        if (result.Errors.Any(error => error.Code == "ConcurrencyFailure"))
+        {
+            logger.LogWarning("Identity user concurrency conflict. Result={Result}", "Conflict");
+            ModelState.AddModelError("", "This record was changed by another user. Please refresh and try again.");
+            return false;
+        }
         foreach (var error in result.Errors) ModelState.AddModelError("", error.Description);
         return result.Succeeded;
     }
@@ -281,9 +287,12 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
     private bool ValidEditToken(string? token, ApplicationUser user)
     {
         if (string.IsNullOrEmpty(token)) return false;
-        try { return editProtector.Unprotect(token) == user.Id + "\n" + user.ConcurrencyStamp; }
+        try { return editProtector.Unprotect(token) == UserEditValue(user); }
         catch (System.Security.Cryptography.CryptographicException) { return false; }
     }
+
+    private static string UserEditValue(ApplicationUser user) =>
+        $"{user.Id}\n{user.ConcurrencyStamp}\n{Convert.ToBase64String(user.RowVersion)}";
 
     private void SaveError(DbUpdateException exception)
     {

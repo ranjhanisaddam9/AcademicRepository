@@ -8,8 +8,8 @@
 <form asp-action="Login" method="post">
 <input asp-for="ReturnUrl" type="hidden" />
 <div asp-validation-summary="All" class="text-danger" role="alert"></div>
-<div class="mb-3"><label asp-for="Email" class="form-label"></label><input asp-for="Email" class="form-control" autocomplete="username" /></div>
-<div class="mb-3"><label asp-for="Password" class="form-label"></label><input asp-for="Password" class="form-control" autocomplete="current-password" /></div>
+<div class="mb-3"><label asp-for="Email" class="form-label"></label><input asp-for="Email" class="form-control" autocomplete="username" /><span asp-validation-for="Email" class="field-validation-error"></span></div>
+<div class="mb-3"><label asp-for="Password" class="form-label"></label><input asp-for="Password" class="form-control" autocomplete="current-password" /><span asp-validation-for="Password" class="field-validation-error"></span></div>
 <div class="form-check mb-3"><input asp-for="RememberMe" class="form-check-input" /><label asp-for="RememberMe" class="form-check-label">Remember me</label></div>
 <button type="submit" class="btn btn-primary">Sign In</button> <a asp-action="ForgotPassword">Forgot Password</a>
 </form></div>

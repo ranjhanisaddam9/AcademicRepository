@@ -11,4 +11,5 @@ public sealed class SystemSetting
     [MaxLength(240), Required] public string Description { get; set; } = "";
     public DateTime UpdatedAt { get; set; }
     [MaxLength(450), Required] public string UpdatedByUserId { get; set; } = "";
+    public byte[] RowVersion { get; set; } = [];
 }

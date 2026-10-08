@@ -24,6 +24,6 @@
 @await Component.InvokeAsync("SubmissionVersions", new { submissionId = Model.Id })
 @if (Model.Status == SubmissionStatus.Rejected && ViewData["CanStartRevision"] is true)
 {
-<form asp-action="StartRevision" asp-route-id="@Model.Id" method="post"><button class="btn btn-primary" type="submit">Start Revision</button></form>
+<form asp-action="StartRevision" asp-route-id="@Model.Id" method="post"><button class="btn btn-primary" type="submit" data-confirm="Start a revision of this rejected submission? The previous versions and review history will be preserved." data-loading-text="Starting revision…">Start Revision</button></form>
 }
 else if (Model.Status == SubmissionStatus.Rejected) { <p class="alert alert-warning">This legacy rejection has no reliable submitted version for revision. Contact your administrator.</p> }

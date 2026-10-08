@@ -96,10 +96,11 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
         return true;
     }
 
-    private IQueryable<SubmissionReview> ApplyFilters(IQueryable<SubmissionReview> query, RepositoryScope scope, RepositoryFilterViewModel filter)
+    internal static IQueryable<SubmissionReview> ApplyFilters(IQueryable<SubmissionReview> query, RepositoryScope scope, RepositoryFilterViewModel filter)
     {
         if (filter.Search?.Length > 200 || filter.AcademicYear?.Length > 30 || filter.Semester?.Length > 50
             || filter.Supervisor?.Length > 150 || filter.DepartmentId < 1 || !Enum.IsDefined(filter.Sort)
+            || !filter.HasValidApprovalDateRange
             || (filter.ProjectType.HasValue && !Enum.IsDefined(filter.ProjectType.Value)))
             throw new ReviewOperationException(400, "Choose valid repository search criteria.");
         // A department parameter never overrides Student/Coordinator/Head scope.
@@ -125,6 +126,22 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
         if (filter.ProjectType.HasValue) query = query.Where(r => r.SubmissionVersion!.ProjectTypeSnapshot == filter.ProjectType);
         if (!string.IsNullOrWhiteSpace(filter.AcademicYear)) { var year = filter.AcademicYear.Trim(); query = query.Where(r => r.SubmissionVersion!.AcademicYearSnapshot == year); }
         if (!string.IsNullOrWhiteSpace(filter.Semester)) { var semester = filter.Semester.Trim(); query = query.Where(r => r.SubmissionVersion!.SemesterSnapshot == semester); }
+        query = ApplyApprovalDateFilter(query, filter);
+        return query;
+    }
+
+    internal static IQueryable<SubmissionReview> ApplyApprovalDateFilter(IQueryable<SubmissionReview> query, RepositoryFilterViewModel filter)
+    {
+        if (filter.ApprovedFrom.HasValue)
+        {
+            var fromUtc = filter.ApprovedFrom.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            query = query.Where(r => r.CompletedAt >= fromUtc);
+        }
+        if (filter.ApprovedTo.HasValue && filter.ApprovedTo.Value < DateOnly.MaxValue)
+        {
+            var toExclusiveUtc = filter.ApprovedTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            query = query.Where(r => r.CompletedAt < toExclusiveUtc);
+        }
         return query;
     }
 

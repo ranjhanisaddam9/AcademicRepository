@@ -1,0 +1,25 @@
+@{
+    var notifications = new (string Key, string Kind, string Label, string Role)[]
+    {
+        ("Status", "success", "Success", "status"),
+        ("Info", "info", "Information", "status"),
+        ("Warning", "warning", "Warning", "alert"),
+        ("Error", "error", "Error", "alert")
+    };
+    var hasNotifications = notifications.Any(item => TempData[item.Key] is string);
+}
+@if (hasNotifications)
+{
+    <section class="toast-region" aria-label="Notifications">
+        @foreach (var notification in notifications)
+        {
+            if (TempData[notification.Key] is string message)
+            {
+                <div class="feedback-toast feedback-toast-@notification.Kind" role="@notification.Role" aria-live="@(notification.Role == "alert" ? "assertive" : "polite")" aria-atomic="true">
+                    <div class="feedback-toast-heading"><strong>@notification.Label</strong><button type="button" class="toast-dismiss" aria-label="Dismiss @notification.Label notification" data-toast-dismiss>×</button></div>
+                    <p>@message</p>
+                </div>
+            }
+        }
+    </section>
+}

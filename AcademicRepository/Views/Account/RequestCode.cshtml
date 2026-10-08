@@ -5,6 +5,6 @@
 @if (!recovery) { <p>Use your Student email, for example <strong>CSC20F005@@smiu.edu.pk</strong>: department letters, two-digit year, F (Fall) or S (Spring), and three digits. After your first successful verification, your account is created in the department identified by the leading letters.</p> }
 <form method="post" asp-action="@(recovery ? "ForgotPassword" : "StudentSignIn")">
 <div asp-validation-summary="All" class="text-danger" role="alert"></div>
-<div class="mb-3"><label asp-for="Email" class="form-label">SMIU Email</label><input asp-for="Email" class="form-control" autocomplete="email" /></div>
+<div class="mb-3"><label asp-for="Email" class="form-label">SMIU Email</label><input asp-for="Email" class="form-control" autocomplete="email" /><span asp-validation-for="Email" class="field-validation-error"></span></div>
 <button class="btn btn-primary">Send Verification Code</button> <a asp-action="Login">Back to Sign In</a>
 </form></div>

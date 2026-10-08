@@ -13,6 +13,7 @@ public sealed class DepartmentFormViewModel
     [StringLength(3), RegularExpression("^([A-Z]{3})?$", ErrorMessage = "StudentCode must contain three letters, for example CSC.")]
     [Display(Name = "Student email code")]
     public string? StudentEmailKeyword { get; set; }
+    public byte[]? RowVersion { get; set; }
 }
 
 public sealed record DepartmentListViewModel(int Id, string Code, string Name, bool IsActive, string StudentEmailKeyword = "");

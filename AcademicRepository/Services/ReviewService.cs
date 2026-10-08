@@ -182,7 +182,7 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
         catch (DbUpdateException ex)
         {
             logger.LogWarning(ex, "Review persistence conflict. Result={Result}", "Conflict");
-            throw new ReviewOperationException(409, "The review changed or could not be saved. Reload the page before trying again.");
+            throw new ReviewOperationException(409, "This record was changed by another user. Please refresh and try again.");
         }
     }
     public async Task<IReadOnlyList<ReviewHistoryItem>> GetStudentHistoryAsync(string userId, int id)
