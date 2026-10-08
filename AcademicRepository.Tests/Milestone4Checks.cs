@@ -202,7 +202,8 @@ internal static partial class IntegrationChecks
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var realStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
-        var settings = scope.ServiceProvider.GetRequiredService<IOptions<FileStorageOptions>>();
+        var storageSettings = scope.ServiceProvider.GetRequiredService<IOptions<FileStorageOptions>>().Value;
+        var settings = new TestOperationalSettings(storageSettings.MaxFileSizeMB, storageSettings.MaxFilesPerSubmission);
         var before = await db.ProjectFiles.CountAsync();
         UploadResourceViewModel Upload() => new() { File = new FormFile(new MemoryStream(TestPdf), 0, TestPdf.Length, "File", "Failure.pdf"), ResourceType = ProjectResourceType.Report };
         var broken = new FaultingStorage(realStorage) { FailStore = true };
@@ -235,6 +236,15 @@ internal static partial class IntegrationChecks
             && File.Exists(Path.Combine(root, existing.StoredFileName)), "Physical delete failure reports inaccessible orphan for cleanup"); }
         await realStorage.DeleteAsync(existing.StoredFileName);
     }
+}
+
+internal sealed class TestOperationalSettings(int maxFileSizeMB, int maxFilesPerSubmission) : IOperationalSettingsService
+{
+    public Task<OperationalSettingsViewModel> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult(new OperationalSettingsViewModel
+    {
+        MaxFileSizeMB = maxFileSizeMB, MaxFilesPerSubmission = maxFilesPerSubmission
+    });
+    public Task UpdateAsync(OperationalSettingsViewModel value, string updatedBy, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
 internal sealed class FaultingStorage(IFileStorageService inner) : IFileStorageService

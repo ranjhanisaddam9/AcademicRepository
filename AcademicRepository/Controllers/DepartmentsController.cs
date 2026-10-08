@@ -10,7 +10,7 @@ namespace AcademicRepository.Controllers;
 public class DepartmentsController(ApplicationDbContext db, ILogger<DepartmentsController> logger) : Controller
 {
     public async Task<IActionResult> Index() => View(await db.Departments.AsNoTracking().OrderBy(d => d.Code)
-        .Select(d => new DepartmentListViewModel(d.Id, d.Code, d.Name, d.IsActive)).ToListAsync());
+        .Select(d => new DepartmentListViewModel(d.Id, d.Code, d.Name, d.IsActive, d.StudentEmailKeyword ?? "Not configured")).ToListAsync());
 
     public async Task<IActionResult> Details(int id)
     {
@@ -27,7 +27,8 @@ public class DepartmentsController(ApplicationDbContext db, ILogger<DepartmentsC
     {
         await ValidateAsync(model);
         if (!ModelState.IsValid) return View("Form", model);
-        db.Departments.Add(new Department { Name = model.Name, Code = model.Code });
+        db.Departments.Add(new Department { Name = model.Name, Code = model.Code,
+            StudentEmailKeyword = string.IsNullOrWhiteSpace(model.StudentEmailKeyword) ? null : model.StudentEmailKeyword });
         if (!await SaveAsync()) return View("Form", model);
         TempData["Status"] = "Department created.";
         return RedirectToAction(nameof(Index));
@@ -38,7 +39,7 @@ public class DepartmentsController(ApplicationDbContext db, ILogger<DepartmentsC
     {
         var department = await db.Departments.FindAsync(id);
         if (department is null) return NotFound();
-        return View("Form", new DepartmentFormViewModel { Name = department.Name, Code = department.Code });
+        return View("Form", new DepartmentFormViewModel { Name = department.Name, Code = department.Code, StudentEmailKeyword = department.StudentEmailKeyword ?? "" });
     }
 
     [HttpPost]
@@ -46,10 +47,13 @@ public class DepartmentsController(ApplicationDbContext db, ILogger<DepartmentsC
     {
         var department = await db.Departments.FindAsync(id);
         if (department is null) return NotFound();
+        // Preserve a current Student email mapping when older/manual clients omit this field.
+        model.StudentEmailKeyword ??= department.StudentEmailKeyword;
         await ValidateAsync(model, id);
         if (!ModelState.IsValid) return View("Form", model);
         department.Name = model.Name;
         department.Code = model.Code;
+        department.StudentEmailKeyword = string.IsNullOrWhiteSpace(model.StudentEmailKeyword) ? null : model.StudentEmailKeyword;
         department.UpdatedAt = DateTime.UtcNow;
         if (!await SaveAsync()) return View("Form", model);
         TempData["Status"] = "Department updated.";
@@ -75,10 +79,15 @@ public class DepartmentsController(ApplicationDbContext db, ILogger<DepartmentsC
         model.Code = (model.Code ?? "").Trim().ToUpperInvariant();
         if (model.Name.Length == 0) ModelState.AddModelError(nameof(model.Name), "Department name is required.");
         if (model.Code.Length == 0) ModelState.AddModelError(nameof(model.Code), "Department code is required.");
+        model.StudentEmailKeyword = model.StudentEmailKeyword?.Trim().ToUpperInvariant();
+        if (!string.IsNullOrWhiteSpace(model.StudentEmailKeyword) && !System.Text.RegularExpressions.Regex.IsMatch(model.StudentEmailKeyword, "^[A-Z]{3}$"))
+            ModelState.AddModelError(nameof(model.StudentEmailKeyword), "Student email code must contain three letters, for example CSC.");
         if (await db.Departments.AnyAsync(d => d.Id != id && d.Name == model.Name))
             ModelState.AddModelError(nameof(model.Name), "A department with this name already exists.");
         if (await db.Departments.AnyAsync(d => d.Id != id && d.Code == model.Code))
             ModelState.AddModelError(nameof(model.Code), "A department with this code already exists.");
+        if (!string.IsNullOrWhiteSpace(model.StudentEmailKeyword) && await db.Departments.AnyAsync(d => d.Id != id && d.StudentEmailKeyword == model.StudentEmailKeyword))
+            ModelState.AddModelError(nameof(model.StudentEmailKeyword), "This Student email code is already assigned to a department.");
     }
 
     private async Task<bool> SaveAsync()

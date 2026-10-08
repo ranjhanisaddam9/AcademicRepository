@@ -1,0 +1,7 @@
+@model AdminDashboardViewModel
+@{ ViewData["Title"] = "Operations"; }
+<h1>Administrative overview</h1><p>Operational counts and configuration health. Academic review actions are not available here.</p>
+<div class="row g-3">@foreach(var item in Model.Overview){<div class="col-sm-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted">@item.Label</div><strong class="fs-3">@item.Count</strong></div></div></div>}</div>
+<h2 class="mt-4">Warnings</h2><ul>@foreach(var item in Model.Warnings){<li>@item.Label: <strong>@item.Count</strong></li>}</ul>
+<h2>Health</h2><ul><li>Database: @(Model.DatabaseHealthy ? "Available" : "Unavailable")</li><li>File storage: @(Model.FileStorageHealthy ? "Available" : "Unavailable")</li><li>Microsoft Graph configuration: @(Model.GraphConfigured ? "Configured" : "Not configured")</li></ul>
+<p>Environment: @Model.Environment · Version: @Model.ApplicationVersion · Checked: @Model.UtcNow.ToString("u")</p>

@@ -14,7 +14,7 @@ public interface IRepositoryService
 }
 
 public sealed class RepositoryService(ApplicationDbContext db, UserManager<ApplicationUser> users,
-    IFileStorageService storage, ILogger<RepositoryService> logger, TimeProvider clock, IConfiguration configuration) : IRepositoryService
+    IFileStorageService storage, ILogger<RepositoryService> logger, IOperationalSettingsService operationalSettings) : IRepositoryService
 {
     private async Task<RepositoryScope> ScopeAsync(string userId, bool institutionWide = false)
     {
@@ -168,7 +168,7 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
             .Select(d => new RepositoryDepartmentOption(d.Id, d.Name)).ToListAsync() : null;
         var inconsistent = await ApprovedScope(scope).AnyAsync(s => !eligible.Any(r => r.ProjectSubmissionId == s.Id));
         if (inconsistent) logger.LogWarning("Inconsistent approved repository records detected in authorized scope for user {UserId}.", userId);
-        const int pageSize = 20;
+        var pageSize = (await operationalSettings.GetAsync()).RepositoryPageSize;
         var total = await query.CountAsync();
         var pages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
         filter.Page = Math.Min(filter.Page, pages);
@@ -216,8 +216,7 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
         var types = await query.GroupBy(r => r.SubmissionVersion!.ProjectTypeSnapshot).Select(g => new RepositoryTypeCount(g.Key, g.Count())).ToListAsync();
         var years = await query.GroupBy(r => r.SubmissionVersion!.AcademicYearSnapshot).OrderByDescending(g => g.Key).Select(g => new RepositoryGroupCount(g.Key ?? "Not recorded", g.Count())).ToListAsync();
         var semesters = await query.GroupBy(r => r.SubmissionVersion!.SemesterSnapshot).OrderBy(g => g.Key).Select(g => new RepositoryGroupCount(g.Key ?? "Not recorded", g.Count())).ToListAsync();
-        var year = clock.GetUtcNow().Month >= 7 ? clock.GetUtcNow().Year : clock.GetUtcNow().Year - 1;
-        var currentYear = configuration["Repository:CurrentAcademicYear"] ?? $"{year}-{year + 1}";
+        var currentYear = (await operationalSettings.GetAsync()).DefaultAcademicYear;
         var currentCount = await query.CountAsync(r => r.SubmissionVersion!.AcademicYearSnapshot == currentYear);
         var recent = await GetApprovedProjectsAsync(userId, new());
         return new(scope.DepartmentName, total, types, years, semesters, currentYear, currentCount, recent.Items.Take(5).ToList(), recent.HasUnavailableRecords);

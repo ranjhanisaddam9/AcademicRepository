@@ -1,0 +1,7 @@
+@model AdminSystemInformationViewModel
+@{ ViewData["Title"] = "System Information"; }
+<h1>System information</h1><dl class="row">
+<dt class="col-sm-4">Environment</dt><dd class="col-sm-8">@Model.Environment</dd><dt class="col-sm-4">Application version</dt><dd class="col-sm-8">@Model.ApplicationVersion</dd><dt class="col-sm-4">UTC time</dt><dd class="col-sm-8">@Model.UtcNow.ToString("u")</dd>
+<dt class="col-sm-4">Database</dt><dd class="col-sm-8">@(Model.DatabaseHealthy ? "Available" : "Unavailable")</dd><dt class="col-sm-4">File storage</dt><dd class="col-sm-8">@(Model.FileStorageHealthy ? "Available" : "Unavailable")</dd><dt class="col-sm-4">Microsoft Graph</dt><dd class="col-sm-8">@(Model.GraphConfigured ? "Configured" : "Not configured")</dd><dt class="col-sm-4">Sender</dt><dd class="col-sm-8">@(Model.SenderEmail ?? "Not configured")</dd>
+<dt class="col-sm-4">Maximum file size</dt><dd class="col-sm-8">@Model.MaxFileSizeMB MB</dd><dt class="col-sm-4">Maximum files per submission</dt><dd class="col-sm-8">@Model.MaxFilesPerSubmission</dd><dt class="col-sm-4">Code expiry / attempts / resend delay</dt><dd class="col-sm-8">@Model.OtpExpiryMinutes min / @Model.OtpMaxAttempts / @Model.OtpResendCooldownSeconds sec</dd><dt class="col-sm-4">Academic year</dt><dd class="col-sm-8">@Model.DefaultAcademicYear</dd>
+</dl>

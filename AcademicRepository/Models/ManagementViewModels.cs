@@ -10,9 +10,12 @@ public sealed class DepartmentFormViewModel
     public string Name { get; set; } = "";
     [Required, StringLength(20)]
     public string Code { get; set; } = "";
+    [StringLength(3), RegularExpression("^([A-Z]{3})?$", ErrorMessage = "StudentCode must contain three letters, for example CSC.")]
+    [Display(Name = "Student email code")]
+    public string? StudentEmailKeyword { get; set; }
 }
 
-public sealed record DepartmentListViewModel(int Id, string Code, string Name, bool IsActive);
+public sealed record DepartmentListViewModel(int Id, string Code, string Name, bool IsActive, string StudentEmailKeyword = "");
 public sealed record DepartmentDetailsViewModel(int Id, string Code, string Name, bool IsActive, DateTime CreatedAt, DateTime? UpdatedAt, int UserCount);
 
 public sealed class UserFormViewModel

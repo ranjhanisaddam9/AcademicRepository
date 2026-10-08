@@ -30,7 +30,9 @@ public sealed partial class LocalFileStorageService : IFileStorageService
         var webRoot = Path.GetFullPath(environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot"));
         if (root.Equals(webRoot, StringComparison.OrdinalIgnoreCase) || root.StartsWith(webRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("FileStorage:RootPath must be outside the web root.");
-        maxBytes = settings.MaxBytes;
+        // The request/feature limit is dynamically administered in OperationalSettingsService.
+        // Keep this storage boundary at the non-editable product ceiling (100 MB).
+        maxBytes = 100L * 1024 * 1024;
         Directory.CreateDirectory(root);
         // Reject symlink/junction ancestors so private storage cannot resolve into a served directory.
         for (var directory = new DirectoryInfo(root); directory is not null; directory = directory.Parent)

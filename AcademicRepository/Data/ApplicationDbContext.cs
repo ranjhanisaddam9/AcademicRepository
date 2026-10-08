@@ -14,10 +14,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SubmissionReview> SubmissionReviews => Set<SubmissionReview>();
     public DbSet<SubmissionVersion> SubmissionVersions => Set<SubmissionVersion>();
     public DbSet<SubmissionVersionFile> SubmissionVersionFiles => Set<SubmissionVersionFile>();
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+        builder.Entity<SystemSetting>(entity =>
+        {
+            entity.HasIndex(s => s.Key).IsUnique();
+            entity.Property(s => s.Key).UseCollation("Latin1_General_100_CI_AS");
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(s => s.UpdatedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
         builder.Entity<SubmissionVersion>(entity =>
         {
             entity.HasIndex(v => new { v.ProjectSubmissionId, v.VersionNumber }).IsUnique();

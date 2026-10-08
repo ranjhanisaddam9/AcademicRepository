@@ -68,15 +68,20 @@ internal static partial class IntegrationChecks
         Check(!await db.Users.AnyAsync(u => u.Email == "weak@smiu.edu.pk"), "Failed user create is atomic");
         await InvalidPost(admin, "/Users/Create", NewUser("Coordinator", password, department.Id), "already assigned", "Duplicate user email");
         await InvalidPost(admin, "/Users/Create", NewUser("Student", password, department.Id), "Admins create staff accounts only", "Admin cannot register a Student");
+        Check(await db.Departments.AnyAsync(d => d.StudentEmailKeyword == "CSC" && d.IsActive), "Student login department mapping is active after administration tests");
+        Check(!await db.Users.AnyAsync(u => u.Email == "CSC20F002@smiu.edu.pk")
+            && !await db.AuthenticationCodes.AnyAsync(c => c.Email == "CSC20F002@SMIU.EDU.PK"), "Student onboarding fixture has no pre-existing account or code");
         using (var registering = Client(factory)) await LoginStudentAsync(registering, "CSC20F002@smiu.edu.pk", emailSender);
         var registered = await db.Users.AsNoTracking().SingleAsync(u => u.Email == "csc20f002@smiu.edu.pk");
         var studentProfile = NewUser("Student", password, department.Id);
-        Check((await PostFormAsync(admin, $"/Users/Edit/{registered.Id}", studentProfile)).StatusCode == HttpStatusCode.Redirect, "Admin may maintain a verified Student profile");
+        Check((await admin.GetAsync($"/Users/Edit/{registered.Id}")).StatusCode == HttpStatusCode.Redirect, "Admin cannot edit a self-onboarded Student profile");
+        Check(registered.StudentNumber == "CSC-20F-002" && registered.Email == "csc20f002@smiu.edu.pk", "Admin edit attempt preserves Student identity");
         clock.Advance(TimeSpan.FromSeconds(61));
         Check((await admin.PostAsync("/Users/Create", new FormUrlEncodedContent(NewUser("Student", password, department.Id)))).StatusCode == HttpStatusCode.BadRequest, "User management CSRF protection");
         Check((await admin.PostAsync("/Departments/Create", new FormUrlEncodedContent(new Dictionary<string,string> { ["Name"] = "Unprotected", ["Code"] = "X" }))).StatusCode == HttpStatusCode.BadRequest, "Department management CSRF protection");
 
         var student = await db.Users.AsNoTracking().SingleAsync(u => u.Email == "CSC20F002@smiu.edu.pk");
+        var staff = await db.Users.SingleAsync(u => u.Email == "managed-Coordinator@smiu.edu.pk");
         var managementPage = await admin.GetStringAsync("/Users");
         Check((await admin.PostAsync($"/Users/SetActive/{student.Id}", Form(managementPage, new() { ["isActive"] = "invalid" }))).StatusCode == HttpStatusCode.BadRequest, "Invalid user status rejected");
         Check((await admin.PostAsync($"/Departments/SetActive/{department.Id}", Form(managementPage, new()))).StatusCode == HttpStatusCode.BadRequest, "Missing department status rejected");
@@ -93,7 +98,7 @@ internal static partial class IntegrationChecks
             ["Email"] = student.Email!, ["ChallengeToken"] = HiddenValue(studentVerifyPage, "ChallengeToken"), ["Code"] = emailSender.Sent[^1].Code
         }));
         var home = await studentClient.GetStringAsync("/");
-        Check(home.Contains("Welcome, Managed Student") && home.Contains("Department: Computing") && home.Contains("Role: Student"), "Student dashboard profile");
+        Check(home.Contains("Welcome, CSC20F002") && home.Contains("Department: Computing") && home.Contains("Role: Student"), "Student dashboard profile remains intact for self-onboarded account");
         Check(!(await studentClient.GetStringAsync("/Student/Dashboard")).Contains("Not Assigned"), "Role dashboard profile");
         clock.Advance(TimeSpan.FromSeconds(61));
         foreach (var role in IdentitySeeder.Roles.Where(r => r != "Admin"))
@@ -120,51 +125,64 @@ internal static partial class IntegrationChecks
                 Check((await anonymous.GetAsync(path)).StatusCode == HttpStatusCode.Redirect, "Anonymous management protection " + path);
 
         // Role edits remove application roles only; unrelated claims remain untouched.
-        db.UserClaims.Add(new Microsoft.AspNetCore.Identity.IdentityUserClaim<string> { UserId = student.Id, ClaimType = "test-system-claim", ClaimValue = "preserve" });
+        db.UserClaims.Add(new Microsoft.AspNetCore.Identity.IdentityUserClaim<string> { UserId = staff.Id, ClaimType = "test-system-claim", ClaimValue = "preserve" });
         await db.SaveChangesAsync();
-        var edits = NewUser("Coordinator", password, secondId);
-        edits["Email"] = student.Email!; edits["FullName"] = "Updated Student";
-        var editPage = await admin.GetStringAsync($"/Users/Edit/{student.Id}");
+        using var staffClient = Client(factory); await LoginAsync(staffClient, staff.Email!, password);
+        var edits = NewUser("DepartmentHead", password, secondId);
+        edits["Email"] = staff.Email!; edits["FullName"] = "Updated Coordinator";
+        var editPage = await admin.GetStringAsync($"/Users/Edit/{staff.Id}");
         edits["EditToken"] = HiddenValue(editPage, "EditToken");
-        Check(!editPage.Contains(student.ConcurrencyStamp!) && !editPage.Contains(student.SecurityStamp!) && student.PasswordHash is null, "Edit form hides Identity security fields and Student has no password hash");
-        Check((await admin.PostAsync($"/Users/Edit/{student.Id}", Form(editPage, edits))).StatusCode == HttpStatusCode.Redirect, "Change user role and department");
-        var roles = await (from assignment in db.UserRoles join role in db.Roles on assignment.RoleId equals role.Id where assignment.UserId == student.Id select role.Name).ToListAsync();
-        Check(roles.SequenceEqual(new[] { "Coordinator" }) && await db.UserClaims.AnyAsync(c => c.UserId == student.Id && c.ClaimType == "test-system-claim"), "Single application role and preserved system claim");
-        Check((await studentClient.GetAsync("/Student/Dashboard")).StatusCode == HttpStatusCode.Redirect, "Role change invalidates old session");
-        await LoginAsync(studentClient, student.Email!, password);
-        Check((await studentClient.GetAsync("/Coordinator/Dashboard")).StatusCode == HttpStatusCode.OK, "Edited role takes effect on login");
-        home = await studentClient.GetStringAsync("/");
-        Check(home.Contains("Welcome, Updated Student") && home.Contains("Department: Software Engineering") && home.Contains("Role: Coordinator"), "Edited dashboard profile");
+        Check(!editPage.Contains(staff.ConcurrencyStamp!) && !editPage.Contains(staff.SecurityStamp!), "Staff edit form hides Identity security fields");
+        Check((await admin.PostAsync($"/Users/Edit/{staff.Id}", Form(editPage, edits))).StatusCode == HttpStatusCode.Redirect, "Staff role and department can be changed");
+        var roles = await (from assignment in db.UserRoles join role in db.Roles on assignment.RoleId equals role.Id where assignment.UserId == staff.Id select role.Name).ToListAsync();
+        Check(roles.SequenceEqual(new[] { "DepartmentHead" }) && await db.UserClaims.AnyAsync(c => c.UserId == staff.Id && c.ClaimType == "test-system-claim"), "Single staff application role and preserved system claim");
+        Check((await studentClient.GetAsync("/Student/Dashboard")).StatusCode == HttpStatusCode.OK, "Student role remains unchanged after staff edits");
+        Check((await staffClient.GetAsync("/Coordinator/Dashboard")).StatusCode == HttpStatusCode.Redirect, "Staff role change invalidates old session");
+        await LoginAsync(staffClient, staff.Email!, password);
+        Check((await staffClient.GetAsync("/DepartmentHead/Dashboard")).StatusCode == HttpStatusCode.OK, "Edited staff role takes effect on login");
+        home = await staffClient.GetStringAsync("/");
+        Check(home.Contains("Welcome, Updated Coordinator") && home.Contains("Department: Software Engineering") && home.Contains("Role: DepartmentHead"), "Edited staff dashboard profile");
         var listing = await admin.GetStringAsync("/Users");
         var staffHash = await db.Users.Where(u => u.Email == "managed-Coordinator@smiu.edu.pk").Select(u => u.PasswordHash).SingleAsync();
-        Check(listing.Contains("Updated Student") && listing.Contains("Software Engineering") && listing.Contains("Coordinator") && staffHash is not null && !listing.Contains(staffHash), "User listing safe profile fields");
-        await InvalidPost(admin, $"/Users/Edit/{student.Id}", edits, "Reload the edit page", "Stale user edit rejected");
+        Check(listing.Contains("Updated Coordinator") && listing.Contains("Software Engineering") && listing.Contains("DepartmentHead") && staffHash is not null && !listing.Contains(staffHash), "User listing safe profile fields");
+        await InvalidPost(admin, $"/Users/Edit/{staff.Id}", edits, "Reload the edit page", "Stale user edit rejected");
 
-        await ToggleAsync(admin, "/Users", student.Id, false);
-        Check((await studentClient.GetAsync("/Coordinator/Dashboard")).StatusCode == HttpStatusCode.Redirect, "Deactivation invalidates existing session immediately");
+        var studentConversion = NewUser("Student", password, secondId);
+        studentConversion["Email"] = "CSC20F002@smiu.edu.pk";
+        studentConversion["FullName"] = "Updated Coordinator";
+        await InvalidPost(admin, $"/Users/Edit/{staff.Id}", studentConversion,
+            "Administrators cannot create or convert accounts to Students", "Admin cannot convert staff into a Student outside verified onboarding");
+        var rolesAfterRejectedConversion = await (from assignment in db.UserRoles
+                                                   join role in db.Roles on assignment.RoleId equals role.Id
+                                                   where assignment.UserId == staff.Id select role.Name).ToListAsync();
+        Check(rolesAfterRejectedConversion.SequenceEqual(new[] { "DepartmentHead" })
+            && staff.Email == "managed-Coordinator@smiu.edu.pk", "Rejected Student conversion leaves staff identity and role unchanged");
+
+        await ToggleAsync(admin, "/Users", staff.Id, false);
+        Check((await staffClient.GetAsync("/DepartmentHead/Dashboard")).StatusCode == HttpStatusCode.Redirect, "Deactivation invalidates existing session immediately");
         using var inactive = Client(factory);
         var loginPage = await inactive.GetStringAsync("/Account/Login");
-        Check((await inactive.PostAsync("/Account/Login", Form(loginPage, new() { ["Email"] = student.Email!, ["Password"] = password }))).StatusCode == HttpStatusCode.OK, "Inactive user cannot login");
-        await ToggleAsync(admin, "/Users", student.Id, true);
-        await LoginAsync(inactive, student.Email!, password);
-        Check((await inactive.GetAsync("/Coordinator/Dashboard")).StatusCode == HttpStatusCode.OK, "Reactivated user can login");
-        await InvalidPost(admin, $"/Users/ResetPassword/{student.Id}", new() { ["Password"] = "weak" }, "Passwords must", "Reset validates Identity password policy");
-        await InvalidPost(admin, $"/Users/ResetPassword/{student.Id}", new(), "required", "Required reset password error remains visible");
+        Check((await inactive.PostAsync("/Account/Login", Form(loginPage, new() { ["Email"] = staff.Email!, ["Password"] = password }))).StatusCode == HttpStatusCode.OK, "Inactive user cannot login");
+        await ToggleAsync(admin, "/Users", staff.Id, true);
+        await LoginAsync(inactive, staff.Email!, password);
+        Check((await inactive.GetAsync("/DepartmentHead/Dashboard")).StatusCode == HttpStatusCode.OK, "Reactivated staff can login");
+        await InvalidPost(admin, $"/Users/ResetPassword/{staff.Id}", new() { ["Password"] = "weak" }, "Passwords must", "Reset validates Identity password policy");
+        await InvalidPost(admin, $"/Users/ResetPassword/{staff.Id}", new(), "required", "Required reset password error remains visible");
         var newPassword = "New!9a" + Guid.NewGuid().ToString("N");
-        Check((await PostFormAsync(admin, $"/Users/ResetPassword/{student.Id}", new() { ["Password"] = newPassword })).StatusCode == HttpStatusCode.Redirect, "Admin resets password");
+        Check((await PostFormAsync(admin, $"/Users/ResetPassword/{staff.Id}", new() { ["Password"] = newPassword })).StatusCode == HttpStatusCode.Redirect, "Admin resets password");
         Check((await inactive.GetAsync("/")).StatusCode == HttpStatusCode.Redirect, "Password reset revokes session");
         using var resetClient = Client(factory);
         loginPage = await resetClient.GetStringAsync("/Account/Login");
-        Check((await resetClient.PostAsync("/Account/Login", Form(loginPage, new() { ["Email"] = student.Email!, ["Password"] = password }))).StatusCode == HttpStatusCode.OK, "Old password rejected after reset");
-        await LoginAsync(resetClient, student.Email!, newPassword);
+        Check((await resetClient.PostAsync("/Account/Login", Form(loginPage, new() { ["Email"] = staff.Email!, ["Password"] = password }))).StatusCode == HttpStatusCode.OK, "Old password rejected after reset");
+        await LoginAsync(resetClient, staff.Email!, newPassword);
 
         await ToggleAsync(admin, "/Departments", secondId.ToString(), false);
-        var retained = await db.Users.AsNoTracking().SingleAsync(u => u.Id == student.Id);
+        var retained = await db.Users.AsNoTracking().SingleAsync(u => u.Id == staff.Id);
         Check(retained.DepartmentId == secondId && retained.IsActive && (await resetClient.GetAsync("/")).StatusCode == HttpStatusCode.OK, "Inactive department preserves assigned users and access");
         invalid = NewUser("Coordinator", password, secondId); invalid["Email"] = "inactive-dept@smiu.edu.pk";
         await InvalidPost(admin, "/Users/Create", invalid, "active department", "New inactive department assignment rejected");
         var filtered = await admin.GetStringAsync($"/Users?departmentId={secondId}");
-        Check(filtered.Contains("Updated Student") && !filtered.Contains("managed-Admin@smiu.edu.pk"), "Users queried by department");
+        Check(filtered.Contains("Updated Coordinator") && !filtered.Contains("managed-Admin@smiu.edu.pk"), "Users queried by department");
         var own = await db.Users.AsNoTracking().SingleAsync(u => u.Email == "admin@smiu.edu.pk");
         await ToggleAsync(admin, "/Users", own.Id, false);
         Check(await db.Users.Where(u => u.Id == own.Id).Select(u => u.IsActive).SingleAsync(), "Admin cannot deactivate self");
@@ -187,14 +205,18 @@ internal static partial class IntegrationChecks
     }
     static async Task LoginStudentAsync(HttpClient client, string email, RecordingAuthenticationEmailSender emailSender)
     {
+        var sentBefore = emailSender.Sent.Length;
         var page = await client.GetStringAsync("/Account/StudentSignIn");
         var response = await client.PostAsync("/Account/StudentSignIn", Form(page, new() { ["Email"] = email }));
         var verify = await response.Content.ReadAsStringAsync();
+        var requestText = System.Text.RegularExpressions.Regex.Replace(verify, "<[^>]*>", " ").Replace("&nbsp;", " ");
+        Check(emailSender.Sent.Length > sentBefore && string.Equals(emailSender.Sent[^1].Email, email, StringComparison.OrdinalIgnoreCase), "Valid Student OTP request is sent to the matching email; response=" + response.StatusCode + " " + requestText[..Math.Min(requestText.Length, 300)]);
         response = await client.PostAsync("/Account/VerifyStudentCode", Form(verify, new()
         {
             ["Email"] = email, ["ChallengeToken"] = HiddenValue(verify, "ChallengeToken"), ["Code"] = emailSender.Sent[^1].Code
         }));
-        Check(response.StatusCode == HttpStatusCode.Redirect, "Passwordless Student login " + email);
+        var responseBody = response.StatusCode == HttpStatusCode.Redirect ? "" : (await response.Content.ReadAsStringAsync());
+        Check(response.StatusCode == HttpStatusCode.Redirect, "Passwordless Student login " + email + " returned " + response.StatusCode + ": " + responseBody[..Math.Min(responseBody.Length, 3000)]);
     }
     static async Task<HttpResponseMessage> PostFormAsync(HttpClient client, string path, Dictionary<string,string> values)
     {

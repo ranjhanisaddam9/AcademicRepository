@@ -1,13 +1,17 @@
+@inject AcademicRepository.Services.IOperationalSettingsService OperationalSettings
+@{ var applicationName = "Academic Project Repository"; string? supportEmail = null;
+   try { var runtimeSettings = await OperationalSettings.GetAsync(); applicationName = runtimeSettings.ApplicationDisplayName; supportEmail = runtimeSettings.SupportEmail; }
+   catch (Exception) { } }
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>@ViewData["Title"] - Academic Repository</title>
+<title>@ViewData["Title"] - @applicationName</title>
 <link rel="stylesheet" href="~/lib/bootstrap/bootstrap.min.css" />
 </head>
 <body>
 <nav class="navbar navbar-dark bg-primary mb-4"><div class="container d-flex flex-wrap gap-3">
-<a class="navbar-brand" asp-controller="Home" asp-action="Index">Academic Repository</a>
+<a class="navbar-brand" asp-controller="Home" asp-action="Index">@applicationName</a>
 @if (User.Identity?.IsAuthenticated == true)
 {
     <a class="text-white" asp-controller="Home" asp-action="Index">Home</a>
@@ -22,6 +26,10 @@
             {
                 <a class="text-white" asp-controller="Departments" asp-action="Index">Departments</a>
                 <a class="text-white" asp-controller="Users" asp-action="Index">Users</a>
+                <a class="text-white" asp-controller="Admin" asp-action="Overview">Operations</a>
+                <a class="text-white" asp-controller="Admin" asp-action="SystemInformation">System Information</a>
+                <a class="text-white" asp-controller="Admin" asp-action="Diagnostics">Diagnostics</a>
+                <a class="text-white" asp-controller="Admin" asp-action="Settings">Settings</a>
             }
             else if (role == "ORICQEC")
             {
@@ -52,4 +60,5 @@ else { <a class="text-white" asp-controller="Account" asp-action="Login">Login</
 @if (TempData["Status"] is string status) { <div class="alert alert-success" role="status">@status</div> }
 @if (TempData["Error"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
 @RenderBody()</main>
+@if (!string.IsNullOrWhiteSpace(supportEmail)) { <footer class="container mt-4 mb-3 text-muted">Support: <a href="mailto:@supportEmail">@supportEmail</a></footer> }
 </body></html>

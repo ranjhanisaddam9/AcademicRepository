@@ -36,14 +36,15 @@ public sealed record VerifiedCode(ApplicationUser User, string? RecoveryGrant);
 
 public sealed class AuthenticationCodeService(ApplicationDbContext db, UserManager<ApplicationUser> users,
     AuthenticationCodeHasher hasher, IDataProtectionProvider protection, IAuthenticationEmailSender emailSender,
-    IOptions<AuthenticationCodeOptions> options, TimeProvider clock, ILogger<AuthenticationCodeService> logger,
+    IOptions<AuthenticationCodeOptions> options, IOperationalSettingsService operationalSettings, TimeProvider clock, ILogger<AuthenticationCodeService> logger,
     StudentDepartmentService departments)
 {
     private readonly IDataProtector tokens = protection.CreateProtector("AcademicRepository.AuthenticationCodes.v1");
-    private AuthenticationCodeOptions Settings => options.Value;
+    private AuthenticationCodeOptions Defaults => options.Value;
 
     public async Task<string> RequestAsync(string email, CodePurpose purpose, CancellationToken cancellationToken = default)
     {
+        var configured = await operationalSettings.GetAsync(cancellationToken);
         var nonce = Guid.NewGuid();
         if (!InstitutionalEmail.IsValid(email)) return Challenge(purpose, nonce);
         var user = await users.FindByEmailAsync(email.Trim());
@@ -58,8 +59,8 @@ public sealed class AuthenticationCodeService(ApplicationDbContext db, UserManag
         var existing = await db.AuthenticationCodes.SingleOrDefaultAsync(c => c.Email == normalizedEmail && c.Purpose == purpose, cancellationToken);
         if (existing is not null)
         {
-            if (now - existing.LastSentAt < TimeSpan.FromSeconds(Settings.ResendCooldownSeconds)) return Challenge(purpose, existing.Nonce);
-            if (now - existing.WindowStartedAt < TimeSpan.FromHours(1) && existing.SentInWindow >= Settings.MaxRequestsPerHour) return Challenge(purpose, existing.Nonce);
+            if (now - existing.LastSentAt < TimeSpan.FromSeconds(configured.OtpResendCooldownSeconds)) return Challenge(purpose, existing.Nonce);
+            if (now - existing.WindowStartedAt < TimeSpan.FromHours(1) && existing.SentInWindow >= Defaults.MaxRequestsPerHour) return Challenge(purpose, existing.Nonce);
         }
         var entry = existing ?? new AuthenticationCode { Email = normalizedEmail, Purpose = purpose, WindowStartedAt = now };
         entry.UserId = user?.Id;
@@ -68,7 +69,7 @@ public sealed class AuthenticationCodeService(ApplicationDbContext db, UserManag
         entry.Nonce = nonce;
         entry.SecurityStamp = user?.SecurityStamp ?? "";
         entry.CodeHash = hasher.Hash(CodeValue(entry, code));
-        entry.ExpiresAt = now.AddMinutes(Settings.ExpiryMinutes);
+        entry.ExpiresAt = now.AddMinutes(configured.OtpExpiryMinutes);
         entry.LastSentAt = now;
         entry.SentInWindow++;
         entry.Attempts = 0;
@@ -91,11 +92,12 @@ public sealed class AuthenticationCodeService(ApplicationDbContext db, UserManag
 
     public async Task<VerifiedCode?> VerifyAsync(string token, string code, CodePurpose purpose)
     {
+        var configured = await operationalSettings.GetAsync();
         var parts = Read(token);
         if (parts is null || parts.Length != 2 || parts[0] != purpose.ToString() || !Guid.TryParse(parts[1], out var nonce)) return null;
         var entry = await db.AuthenticationCodes.SingleOrDefaultAsync(c => c.Nonce == nonce && c.Purpose == purpose);
         var now = clock.GetUtcNow();
-        if (entry is null || entry.ConsumedAt.HasValue || entry.ExpiresAt <= now || entry.Attempts >= Settings.MaxAttempts) return null;
+        if (entry is null || entry.ConsumedAt.HasValue || entry.ExpiresAt <= now || entry.Attempts >= configured.OtpMaxAttempts) return null;
         var user = entry.UserId is null ? null : await users.FindByIdAsync(entry.UserId);
         entry.Attempts++;
         var valid = code.Length == 6 && code.All(c => c is >= '0' and <= '9') && hasher.Matches(CodeValue(entry, code), entry.CodeHash);
@@ -138,7 +140,7 @@ public sealed class AuthenticationCodeService(ApplicationDbContext db, UserManag
             {
                 var secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
                 entry.RecoveryGrantHash = hasher.Hash(secret);
-                entry.RecoveryGrantExpiresAt = now.AddMinutes(Settings.RecoveryGrantExpiryMinutes);
+                entry.RecoveryGrantExpiresAt = now.AddMinutes(Defaults.RecoveryGrantExpiryMinutes);
                 grant = tokens.Protect($"grant\n{entry.Id}\n{secret}");
             }
             await db.SaveChangesAsync();

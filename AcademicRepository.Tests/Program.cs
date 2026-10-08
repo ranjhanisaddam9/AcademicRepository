@@ -16,6 +16,7 @@ internal static partial class IntegrationChecks
 public static async Task Main(string[] args)
 {
 if (args is ["--audit"]) { await AuditDatabaseAsync(); return; }
+if (args is ["--email-only"]) { await Office365EmailChecks(); return; }
 await Office365EmailChecks();
 await MigrationUpgradeChecks();
 // Real SQL Server integration checks. Credentials are generated for this run only.
@@ -38,12 +39,12 @@ try
     await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO AspNetUsers (Id,UserName,NormalizedUserName,Email,NormalizedEmail,EmailConfirmed,PasswordHash,SecurityStamp,ConcurrencyStamp,PhoneNumberConfirmed,TwoFactorEnabled,LockoutEnabled,AccessFailedCount) VALUES ({legacy.Id},{legacy.UserName},{legacy.UserName.ToUpperInvariant()},{legacy.Email},{legacy.Email.ToUpperInvariant()},0,{legacyHash},{Guid.NewGuid().ToString()},{Guid.NewGuid().ToString()},0,0,1,0)");
     await Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>(db.Database)
         .MigrateAsync("20261006064402_AddDepartmentsAndUserProfiles");
-    var preserved = await db.Users.FromSqlRaw("SELECT *, CAST(NULL AS nvarchar(11)) AS StudentNumber FROM AspNetUsers").AsNoTracking().SingleAsync(u => u.Id == legacy.Id);
+    var preserved = await db.Users.FromSqlRaw("SELECT *, CAST(NULL AS nvarchar(11)) AS StudentNumber, CAST(NULL AS datetime2) AS CreatedAt FROM AspNetUsers").AsNoTracking().SingleAsync(u => u.Id == legacy.Id);
     Check(preserved.IsActive && preserved.FullName == legacy.UserName && preserved.PasswordHash == legacyHash && preserved.DepartmentId is null, "Milestone 1 user/profile/password preserved by migration");
     var existingDepartment = new Department { Name = "Pre-existing Department", Code = "LEG" };
     await db.Database.ExecuteSqlRawAsync("INSERT INTO Departments (Name,Code,CreatedAt,IsActive) VALUES ('Pre-existing Department','LEG',SYSUTCDATETIME(),1)");
     existingDepartment.Id = await db.Database.SqlQueryRaw<int>("SELECT Id AS Value FROM Departments WHERE Code = 'LEG'").SingleAsync();
-    var existingProfile = await db.Users.FromSqlRaw("SELECT *, CAST(NULL AS nvarchar(11)) AS StudentNumber FROM AspNetUsers").SingleAsync(u => u.Id == legacy.Id);
+    var existingProfile = await db.Users.FromSqlRaw("SELECT *, CAST(NULL AS nvarchar(11)) AS StudentNumber, CAST(NULL AS datetime2) AS CreatedAt FROM AspNetUsers").SingleAsync(u => u.Id == legacy.Id);
     existingProfile.FullName = "Existing Profile";
     existingProfile.DepartmentId = existingDepartment.Id;
     await db.SaveChangesAsync();
@@ -73,6 +74,12 @@ try
             services.AddSingleton<IAuthenticationEmailSender>(testEmailSender);
         });
     });
+    using (var isolationScope = factory.Services.CreateScope())
+    {
+        var appConnection = isolationScope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.GetConnectionString();
+        var appDatabase = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(appConnection).InitialCatalog;
+        Check(string.Equals(appDatabase, database, StringComparison.OrdinalIgnoreCase), "MVC integration host is bound to the generated isolated test database");
+    }
     using var anonymous = Client(factory);
     foreach (var path in IdentitySeeder.Roles.Select(r => $"/{r}/Dashboard").Append("/"))
     {
@@ -157,9 +164,10 @@ try
     await Milestone7Checks(factory, testEmailSender, testClock, password);
     await Milestone8Checks(factory, password);
     await Milestone9Checks(factory, testEmailSender, testClock, password);
+    await Milestone10Checks(factory, password);
     await Milestone35Checks(factory, password, testEmailSender, testClock);
     await OnboardingChecks(factory, testEmailSender, testClock);
-    Console.WriteLine("PASS: All Milestone 1, 2, 3, 3.5, 4, 5, 6, 7, 8 and 9 SQL/MVC integration checks.");
+    Console.WriteLine("PASS: All Milestone 1, 2, 3, 3.5, 4, 5, 6, 7, 8, 9 and 10 SQL/MVC integration checks.");
 }
 finally
 {

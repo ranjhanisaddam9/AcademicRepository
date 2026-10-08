@@ -15,16 +15,41 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
     StudentDepartmentService studentDepartments) : Controller
 {
     private readonly IDataProtector editProtector = protection.CreateProtector("AcademicRepository.UserEdits.v1");
-    public async Task<IActionResult> Index(int? departmentId = null)
+    public async Task<IActionResult> Index(string? search = null, string? role = null, int? departmentId = null, bool? isActive = null, int page = 1)
     {
-        var accounts = await db.Users.AsNoTracking().Include(u => u.Department)
-            .Where(u => departmentId == null || u.DepartmentId == departmentId).OrderBy(u => u.FullName).ToListAsync();
-        var assignments = await (from assignment in db.UserRoles
-                                 join role in db.Roles on assignment.RoleId equals role.Id
-                                 select new { assignment.UserId, role.Name }).ToListAsync();
-        return View(accounts.Select(u => new UserListViewModel(u.Id, u.FullName, u.Email ?? "",
-            string.Join(", ", assignments.Where(a => a.UserId == u.Id && IdentitySeeder.Roles.Contains(a.Name)).Select(a => a.Name)),
-            u.Department?.Name ?? "Not Assigned", u.IsActive)).ToList());
+        if (page < 1 || search?.Length > 200 || (role is not null && !IdentitySeeder.Roles.Contains(role)) || departmentId < 1)
+            return BadRequest("Choose valid user filters.");
+        search = search?.Trim();
+        var query = db.Users.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(u => u.FullName.Contains(search) || (u.Email != null && u.Email.Contains(search)) || (u.StudentNumber != null && u.StudentNumber.Contains(search)));
+        if (role is not null)
+            query = query.Where(u => (from assignment in db.UserRoles join assignedRole in db.Roles on assignment.RoleId equals assignedRole.Id
+                where assignment.UserId == u.Id && assignedRole.Name == role select assignment.UserId).Any());
+        if (departmentId.HasValue) query = query.Where(u => u.DepartmentId == departmentId);
+        if (isActive.HasValue) query = query.Where(u => u.IsActive == isActive);
+        const int pageSize = 20;
+        var total = await query.CountAsync();
+        var pageCount = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+        page = Math.Min(page, pageCount);
+        var accounts = await query.Include(u => u.Department).OrderBy(u => u.FullName).ThenBy(u => u.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        var ids = accounts.Select(u => u.Id).ToArray();
+        var assignments = await (from assignment in db.UserRoles.AsNoTracking()
+                                 join assignedRole in db.Roles on assignment.RoleId equals assignedRole.Id
+                                 where ids.Contains(assignment.UserId) && IdentitySeeder.Roles.Contains(assignedRole.Name!)
+                                 select new { assignment.UserId, assignedRole.Name }).ToListAsync();
+        var departments = await db.Departments.AsNoTracking().Where(d => d.IsActive || d.Id == departmentId).OrderBy(d => d.Name)
+            .Select(d => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem(d.Name, d.Id.ToString())).ToListAsync();
+        var items = new List<UserListItem>();
+        var assignmentsByUser = assignments.GroupBy(a => a.UserId).ToDictionary(g => g.Key, g => g.Select(a => a.Name).ToArray());
+        foreach (var user in accounts)
+        {
+            var userRoles = assignmentsByUser.GetValueOrDefault(user.Id) ?? Array.Empty<string>();
+            items.Add(new(user.Id, user.FullName, user.Email ?? "", string.Join(", ", userRoles),
+                user.Department?.Name ?? "Not Assigned", user.IsActive, userRoles.Contains("Student") ? user.StudentNumber : null,
+                user.CreatedAt ?? DateTime.MinValue));
+        }
+        return View(new UserListPageViewModel(items, page, pageCount, total, search, role, departmentId, isActive, departments));
     }
 
     [HttpGet]
@@ -65,6 +90,7 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
     {
         var user = await users.FindByIdAsync(id);
         if (user is null) return NotFound();
+        if (await users.IsInRoleAsync(user, "Student")) return Forbid();
         var model = new UserFormViewModel
         {
             FullName = user.FullName, Email = user.Email ?? "", DepartmentId = user.DepartmentId,
@@ -80,10 +106,14 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
     {
         var user = await users.FindByIdAsync(id);
         if (user is null) return NotFound();
-        await ValidateAsync(model, user);
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var previousRoles = await users.GetRolesAsync(user);
-        if (model.Role == "Student" && !previousRoles.Contains("Student"))
-            ModelState.AddModelError(nameof(model.Role), "Students register by verifying their own email code. A staff account cannot be changed to Student.");
+        if (previousRoles.Contains("Student")) return Forbid();
+        if (model.Role == "Student")
+            ModelState.AddModelError(nameof(model.Role), "Administrators cannot create or convert accounts to Students. Students must complete verified self-onboarding.");
+        await ValidateAsync(model, user);
+        if (user.IsActive && previousRoles.Contains("Admin") && model.Role != "Admin" && await ActiveAdminCountAsync() <= 1)
+            ModelState.AddModelError(nameof(model.Role), "You cannot remove the last active Admin account.");
         if (model.Role != "Student" && (previousRoles.Contains("Student") || !await users.HasPasswordAsync(user)) && string.IsNullOrWhiteSpace(model.TemporaryPassword))
             ModelState.AddModelError(nameof(model.TemporaryPassword), "Set a temporary password when changing a passwordless Student to staff.");
         if (user.Id == users.GetUserId(User) && model.Role != "Admin")
@@ -91,7 +121,8 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
         if (!ValidEditToken(model.EditToken, user))
             ModelState.AddModelError("", "This user was changed by another administrator. Reload the edit page before saving.");
         if (!ModelState.IsValid) return await FormAsync(model, user.DepartmentId);
-        await using var transaction = await db.Database.BeginTransactionAsync();
+        if (previousRoles.Any(ApplicationRoles.RequiresDepartment) && model.Role == "ORICQEC" && model.DepartmentId is null)
+            model.DepartmentId = user.DepartmentId;
         try
         {
             user.FullName = model.FullName;
@@ -132,7 +163,13 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
             TempData["Error"] = "You cannot deactivate your own account.";
             return RedirectToAction(nameof(Index));
         }
-        await using var transaction = await db.Database.BeginTransactionAsync();
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        var roles = await users.GetRolesAsync(user);
+        if (!isActive.Value && roles.Contains("Admin") && await ActiveAdminCountAsync() <= 1)
+        {
+            TempData["Error"] = "You cannot deactivate the last active Admin account.";
+            return RedirectToAction(nameof(Index));
+        }
         user.IsActive = isActive.Value;
         var result = await users.UpdateAsync(user);
         if (result.Succeeded) result = await users.UpdateSecurityStampAsync(user);
@@ -207,6 +244,11 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
         model.Departments = await db.Departments.AsNoTracking().Where(d => d.IsActive || d.Id == currentId).OrderBy(d => d.Name)
             .Select(d => new SelectListItem(d.Name + (d.IsActive ? "" : " (inactive)"), d.Id.ToString())).ToListAsync();
     }
+
+    private Task<int> ActiveAdminCountAsync() => (from assignment in db.UserRoles.AsNoTracking()
+        join role in db.Roles on assignment.RoleId equals role.Id
+        join user in db.Users.AsNoTracking() on assignment.UserId equals user.Id
+        where role.Name == "Admin" && user.IsActive select user.Id).Distinct().CountAsync();
 
     private async Task<IActionResult> FormAsync(UserFormViewModel model, int? currentId = null)
     {

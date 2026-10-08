@@ -13,7 +13,7 @@ public interface IRepositoryReportService
 }
 
 public sealed class RepositoryReportService(ApplicationDbContext db, RepositoryService repository,
-    TimeProvider clock, IConfiguration configuration) : IRepositoryReportService
+    IOperationalSettingsService operationalSettings) : IRepositoryReportService
 {
     public async Task<InstitutionRepositoryReport> GetInstitutionSummaryAsync(string userId)
     {
@@ -54,9 +54,7 @@ public sealed class RepositoryReportService(ApplicationDbContext db, RepositoryS
             counts.Where(c => c.DepartmentId == d.Id && c.Type == ProjectType.SemesterProject).Sum(c => c.Count),
             counts.Where(c => c.DepartmentId == d.Id && c.Type == ProjectType.FinalYearProject).Sum(c => c.Count),
             counts.Where(c => c.DepartmentId == d.Id && c.Type == ProjectType.ResearchProject).Sum(c => c.Count))).ToList();
-        var now = clock.GetUtcNow();
-        var yearStart = now.Month >= 7 ? now.Year : now.Year - 1;
-        var currentYear = configuration["Repository:CurrentAcademicYear"] ?? $"{yearStart}-{yearStart + 1}";
+        var currentYear = (await operationalSettings.GetAsync()).DefaultAcademicYear;
         var currentCount = await query.CountAsync(r => r.SubmissionVersion!.AcademicYearSnapshot == currentYear);
         var recent = await query.OrderByDescending(r => r.CompletedAt).ThenByDescending(r => r.ProjectSubmissionId).Take(5)
             .Select(r => new RepositoryListItem(r.ProjectSubmissionId, r.SubmissionVersionId!.Value, r.SubmissionVersion!.VersionNumber,

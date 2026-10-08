@@ -11,9 +11,8 @@ public sealed class ResourceOperationException(int status, string message) : Exc
 }
 
 public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageService storage, SubmissionLock submissionLock,
-    IOptions<FileStorageOptions> options, ILogger<ProjectFileService> logger)
+    IOperationalSettingsService operationalSettings, ILogger<ProjectFileService> logger)
 {
-    private FileStorageOptions Settings => options.Value;
     private async Task<ProjectSubmission> AuthorizedAsync(int submissionId, string studentId, bool locked = false)
     {
         var submission = locked ? await submissionLock.OwnedAsync(submissionId, studentId)
@@ -32,16 +31,18 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
     }
     public async Task<ResourceListViewModel> ListAsync(int submissionId, string studentId)
     {
+        var settings = await operationalSettings.GetAsync();
         var submission = await AuthorizedAsync(submissionId, studentId);
         var files = await db.ProjectFiles.Where(f => f.ProjectSubmissionId == submissionId && f.IsActive).OrderBy(f => f.UploadedAt).ThenBy(f => f.Id)
             .Select(f => new ProjectFileViewModel(f.Id, f.OriginalFileName, f.ResourceType, f.Description, f.FileSize, f.UploadedAt)).ToListAsync();
-        return new(submissionId, SubmissionWorkflow.CanEdit(submission.Status), files, Settings.MaxFileSizeMB, Settings.MaxFilesPerSubmission);
+        return new(submissionId, SubmissionWorkflow.CanEdit(submission.Status), files, settings.MaxFileSizeMB, settings.MaxFilesPerSubmission);
     }
     public async Task UploadAsync(int submissionId, string studentId, UploadResourceViewModel model)
     {
+        var settings = await operationalSettings.GetAsync();
         var file = model.File;
         if (file is null || file.Length <= 0) throw new ResourceOperationException(400, "Choose a non-empty file.");
-        if (file.Length > Settings.MaxBytes) throw new ResourceOperationException(400, $"Files must be no larger than {Settings.MaxFileSizeMB} MB.");
+        if (file.Length > settings.MaxFileSizeMB * 1024L * 1024) throw new ResourceOperationException(400, $"Files must be no larger than {settings.MaxFileSizeMB} MB.");
         if (model.ResourceType is null || !Enum.IsDefined(model.ResourceType.Value) || model.Description?.Length > 1000)
             throw new ResourceOperationException(400, "Select a valid resource type and a description of at most 1000 characters.");
         var name = ResourceFileValidator.SafeOriginalName(file.FileName);
@@ -52,8 +53,8 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
         await using var transaction = await db.Database.BeginTransactionAsync();
         var submission = await AuthorizedAsync(submissionId, studentId, locked: true);
         RequireDraft(submission);
-        if (await db.ProjectFiles.CountAsync(f => f.ProjectSubmissionId == submissionId && f.IsActive) >= Settings.MaxFilesPerSubmission)
-            throw new ResourceOperationException(400, $"A submission can contain at most {Settings.MaxFilesPerSubmission} files.");
+        if (await db.ProjectFiles.CountAsync(f => f.ProjectSubmissionId == submissionId && f.IsActive) >= settings.MaxFilesPerSubmission)
+            throw new ResourceOperationException(400, $"A submission can contain at most {settings.MaxFilesPerSubmission} files.");
         string? key = null;
         var commitStarted = false;
         try

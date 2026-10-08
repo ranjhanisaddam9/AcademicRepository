@@ -3,6 +3,7 @@ using AcademicRepository.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AcademicRepository.Controllers;
 
@@ -11,6 +12,7 @@ public sealed class ProjectFilesController(ProjectFileService files, UserManager
 {
     private string StudentId => users.GetUserId(User) ?? "";
     [HttpPost]
+    [EnableRateLimiting("uploads")]
     public async Task<IActionResult> Upload([FromRoute] int id, UploadResourceViewModel model)
     {
         if (!ModelState.IsValid) return Error(400, "Choose a file, a valid resource type, and a description of at most 1000 characters.");

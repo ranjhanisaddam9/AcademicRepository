@@ -9,4 +9,5 @@ public class ApplicationUser : IdentityUser
     public int? DepartmentId { get; set; }
     public Department? Department { get; set; }
     public bool IsActive { get; set; } = true;
+    public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
 }

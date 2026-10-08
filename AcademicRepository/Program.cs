@@ -26,6 +26,8 @@ builder.Services.AddOptions<EmailOptions>().BindConfiguration("Email")
         : o.HasValidGraphConfiguration(),
         "Use DevelopmentLog only in Development, or configure Email:DeliveryMode=MicrosoftGraph, TenantId, ClientId, ClientSecret and From.").ValidateOnStart();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+builder.Services.AddScoped<IOperationalSettingsService, OperationalSettingsService>();
+builder.Services.AddScoped<IAdminSystemService, AdminSystemService>();
 builder.Services.AddSingleton<AuthenticationCodeHasher>();
 builder.Services.AddScoped<AuthenticationCodeService>();
 builder.Services.AddHttpClient<IAuthenticationEmailSender, AuthenticationEmailSender>(client => client.Timeout = TimeSpan.FromSeconds(30))
@@ -38,6 +40,12 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = context.RequestServices.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthenticationCodeOptions>>().Value.IpPermitLimit,
             Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
+        }));
+    options.AddPolicy("uploads", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 20, Window = TimeSpan.FromHours(1), QueueLimit = 0, AutoReplenishment = true
         }));
 });
 builder.Services.AddScoped<DashboardService>();
@@ -53,8 +61,7 @@ builder.Services.AddScoped<IRepositoryService>(services => services.GetRequiredS
 builder.Services.AddScoped<IRepositoryReportService, RepositoryReportService>();
 builder.Services.AddSingleton<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddOptions<FileStorageOptions>().BindConfiguration("FileStorage").ValidateDataAnnotations().ValidateOnStart();
-var uploadLimit = builder.Configuration.GetValue<int?>("FileStorage:MaxFileSizeMB") ?? 50;
-var requestLimit = uploadLimit * 1024L * 1024 + 1024 * 1024;
+var requestLimit = 101L * 1024 * 1024;
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = requestLimit);
 builder.Services.Configure<Microsoft.AspNetCore.Builder.IISServerOptions>(o => o.MaxRequestBodySize = requestLimit);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o => o.MultipartBodyLengthLimit = requestLimit);
@@ -63,7 +70,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = "/Account/Login";
     options.AccessDeniedPath = "/Account/AccessDenied";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
     options.Events.OnValidatePrincipal = async context =>
     {
         var users = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
@@ -95,6 +102,18 @@ builder.Services.ConfigureApplicationCookie(options =>
 var app = builder.Build();
 _ = app.Services.GetRequiredService<IFileStorageService>();
 _ = app.Services.GetRequiredService<AuthenticationCodeHasher>();
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    // Existing Razor forms use an inline role-toggle script, so script-src is intentionally
+    // deferred until that script is externalized or nonce-based. These directives block
+    // framing, plugin content, hostile base URLs, and cross-origin form submissions meanwhile.
+    context.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'";
+    await next();
+});
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -103,8 +122,8 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllerRoute("default", "{controller=Home}/{action=Index}/{id?}");
 try

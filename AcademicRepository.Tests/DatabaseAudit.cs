@@ -15,6 +15,7 @@ internal static partial class IntegrationChecks
             .AddUserSecrets<Program>(true).AddEnvironmentVariables().Build();
         await using var connection = new SqlConnection(config.GetConnectionString("DefaultConnection"));
         await connection.OpenAsync();
+        Console.WriteLine("Database name: " + connection.Database);
         async Task<string> Json(string sql)
         {
             using var cmd = new SqlCommand(sql + " FOR JSON PATH, INCLUDE_NULL_VALUES", connection);
