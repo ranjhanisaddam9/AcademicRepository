@@ -89,7 +89,7 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                logger.LogWarning("Repository resource {FileId} unavailable ({ErrorType}).", file.Id, ex.GetType().Name);
+                logger.LogWarning(ex, "Repository resource unavailable. FileId={FileId} Result={Result}", file.Id, "Unavailable");
                 return false;
             }
         }
@@ -98,7 +98,7 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
 
     private IQueryable<SubmissionReview> ApplyFilters(IQueryable<SubmissionReview> query, RepositoryScope scope, RepositoryFilterViewModel filter)
     {
-        if (filter.Search?.Length > 200 || filter.AcademicYear?.Length > 30 || filter.Semester?.Length > 50 || filter.Page < 1
+        if (filter.Search?.Length > 200 || filter.AcademicYear?.Length > 30 || filter.Semester?.Length > 50
             || filter.Supervisor?.Length > 150 || filter.DepartmentId < 1 || !Enum.IsDefined(filter.Sort)
             || (filter.ProjectType.HasValue && !Enum.IsDefined(filter.ProjectType.Value)))
             throw new ReviewOperationException(400, "Choose valid repository search criteria.");
@@ -168,15 +168,15 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
             .Select(d => new RepositoryDepartmentOption(d.Id, d.Name)).ToListAsync() : null;
         var inconsistent = await ApprovedScope(scope).AnyAsync(s => !eligible.Any(r => r.ProjectSubmissionId == s.Id));
         if (inconsistent) logger.LogWarning("Inconsistent approved repository records detected in authorized scope for user {UserId}.", userId);
-        var pageSize = (await operationalSettings.GetAsync()).RepositoryPageSize;
-        var total = await query.CountAsync();
-        var pages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
-        filter.Page = Math.Min(filter.Page, pages);
-        var page = await Items(query, filter.Sort).Skip((filter.Page - 1) * pageSize).Take(pageSize).ToListAsync();
-        var availableIds = await AvailableVersionIdsAsync(page.Select(i => i.VersionId).ToArray());
-        var available = page.Where(i => availableIds.Contains(i.VersionId)).ToList();
-        inconsistent |= available.Count != page.Count;
-        return new(scope, filter, available, total, pages, inconsistent, years, departments);
+        var configuredPageSize = PageRequest.NormalizeSize((await operationalSettings.GetAsync()).RepositoryPageSize);
+        var results = await Items(query, filter.Sort).ToPagedResultAsync(filter.Page, filter.PageSize, configuredPageSize);
+        filter.Page = results.PageNumber;
+        filter.PageSize = results.PageSize;
+        var role = scope.InstitutionWide ? "ORICQEC" : scope.DepartmentHead ? "DepartmentHead" : scope.DepartmentWide ? "Coordinator" : "Student";
+        logger.LogInformation("Repository access. Action={Action} UserId={UserId} Role={Role} DepartmentId={DepartmentId} Result={Result} MatchingRecords={MatchingRecords}",
+            "RepositoryList", userId, role, scope.InstitutionWide ? null : scope.DepartmentId, "Success", results.TotalCount);
+        // List pages only query approved-version metadata; file metadata and storage are loaded on details/download.
+        return new(scope, filter, results, inconsistent, years, departments);
     }
 
     private async Task<SubmissionReview> ResolveAsync(string userId, int submissionId, bool institutionWide = false)
@@ -186,8 +186,9 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
             .Include(r => r.Reviewer).Include(r => r.SubmissionVersion!.Department).SingleOrDefaultAsync(r => r.ProjectSubmissionId == submissionId);
         if (review is null)
         {
-            if (await ApprovedScope(scope).AnyAsync(s => s.Id == submissionId))
-                logger.LogWarning("Approved submission {SubmissionId} is not repository eligible.", submissionId);
+            logger.LogWarning("Repository resource access unavailable. Action={Action} UserId={UserId} Role={Role} SubmissionId={SubmissionId} Result={Result}",
+                "OpenRepositoryEntry", userId, scope.InstitutionWide ? "ORICQEC" : scope.DepartmentHead ? "DepartmentHead" : scope.DepartmentWide ? "Coordinator" : "Student",
+                submissionId, "NotFoundOrOutsideScope");
             throw new ReviewOperationException(404, "Approved repository entry not found or unavailable.");
         }
         return review;
@@ -223,16 +224,24 @@ public sealed class RepositoryService(ApplicationDbContext db, UserManager<Appli
     }
     public async Task<(Stream Stream, string Name, string ContentType)> DownloadAsync(string userId, int submissionId, int versionId, int fileId, bool institutionWide = false)
     {
+        var scope = await ScopeAsync(userId, institutionWide);
         var review = await ResolveAsync(userId, submissionId, institutionWide);
         if (review.SubmissionVersionId != versionId) throw new ReviewOperationException(404, "Approved resource not found.");
         var files = await ResourcesAsync(versionId);
         var file = files.SingleOrDefault(f => f.Id == fileId);
         if (file is null) throw new ReviewOperationException(404, "Approved resource not found.");
         if (!await AvailableAsync(files)) throw new ReviewOperationException(404, "Approved repository resources are currently unavailable.");
-        try { return (await storage.OpenReadAsync(file.StoredFileName), file.OriginalFileName, file.ContentType); }
+        try
+        {
+            var stream = await storage.OpenReadAsync(file.StoredFileName);
+            var role = scope.InstitutionWide ? "ORICQEC" : scope.DepartmentHead ? "DepartmentHead" : scope.DepartmentWide ? "Coordinator" : "Student";
+            logger.LogInformation("Secure file access. Action={Action} UserId={UserId} Role={Role} DepartmentId={DepartmentId} SubmissionId={SubmissionId} VersionId={VersionId} FileId={FileId} Result={Result}",
+                "RepositoryFileDownload", userId, role, scope.InstitutionWide ? null : scope.DepartmentId, submissionId, versionId, fileId, "Success");
+            return (stream, file.OriginalFileName, file.ContentType);
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            logger.LogWarning("Repository resource {FileId} unavailable at download ({ErrorType}).", fileId, ex.GetType().Name);
+            logger.LogWarning(ex, "Repository resource unavailable at download. FileId={FileId} Result={Result}", fileId, "Unavailable");
             throw new ReviewOperationException(404, "Approved resource is currently unavailable.");
         }
     }

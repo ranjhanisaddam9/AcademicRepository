@@ -3,6 +3,7 @@ using AcademicRepository.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AcademicRepository.Controllers;
 
@@ -13,8 +14,10 @@ public sealed class CoordinatorController(IReviewService reviews, UserManager<Ap
     [HttpGet]
     public Task<IActionResult> Dashboard() => RunAsync(async () => View(await reviews.GetCoordinatorDashboardAsync(UserId)));
     [HttpGet]
+    [EnableRateLimiting("search")]
     public Task<IActionResult> ReviewQueue([FromQuery] ReviewFilterViewModel filter) => ListingAsync(filter, true);
     [HttpGet]
+    [EnableRateLimiting("search")]
     public Task<IActionResult> Submissions([FromQuery] ReviewFilterViewModel filter) => ListingAsync(filter, false);
     private Task<IActionResult> ListingAsync(ReviewFilterViewModel filter, bool queue) => RunAsync(async () =>
     {
@@ -57,6 +60,8 @@ public sealed class CoordinatorController(IReviewService reviews, UserManager<Ap
     public Task<IActionResult> Download([FromRoute] int id) => RunAsync(async () =>
     {
         var file = await reviews.DownloadAsync(UserId, id);
+        logger.LogInformation("Secure file access. Action={Action} UserId={UserId} Role={Role} FileId={FileId} Result={Result}",
+            "FileDownload", UserId, "Coordinator", id, "Success");
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         Response.Headers.CacheControl = "no-store";
         return File(file.Stream, file.ContentType, file.Name);
@@ -71,9 +76,9 @@ public sealed class CoordinatorController(IReviewService reviews, UserManager<Ap
         }
         catch (System.Data.Common.DbException ex)
         {
-            logger.LogError("Coordinator review database unavailable ({ErrorType}).", ex.GetType().Name);
+            logger.LogError(ex, "Coordinator review database request failed.");
             Response.StatusCode = 503;
-            return View("ReviewError", "Review services are temporarily unavailable. Reload the current status before trying again.");
+            return View("ReviewError", "We couldn't complete your request. Please try again.");
         }
     }
 }

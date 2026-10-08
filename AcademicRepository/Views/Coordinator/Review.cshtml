@@ -1,15 +1,14 @@
 @model ReviewDetailsViewModel
 @{ ViewData["Title"] = "Submission Review"; }
-<h1>@Model.Project.Title</h1>
-<p><partial name="_SubmissionStatus" model="Model.Project.Status" /></p>
-<h2 class="h4">Student</h2>
+<div class="page-heading mb-4"><div class="d-flex flex-wrap align-items-start justify-content-between gap-3"><div><h1>@Model.Project.Title</h1><p class="text-muted mb-0">Submission review</p></div><partial name="_SubmissionStatus" model="Model.Project.Status" /></div></div>
+<section class="review-section"><h2 class="h4">Student</h2>
 <dl class="row">
 <dt class="col-sm-3">Name</dt><dd class="col-sm-9">@Model.Project.StudentName</dd>
 <dt class="col-sm-3">Student ID</dt><dd class="col-sm-9">@(Model.StudentNumber ?? "Not recorded")</dd>
 <dt class="col-sm-3">Email</dt><dd class="col-sm-9">@Model.Email</dd>
 <dt class="col-sm-3">Department</dt><dd class="col-sm-9">@Model.Project.Department</dd>
-</dl>
-<h2 class="h4">Project</h2><dl class="row">
+</dl></section>
+<section class="review-section"><h2 class="h4">Project Details</h2><dl class="row">
 <dt class="col-sm-3">Project Type</dt><dd class="col-sm-9">@Html.DisplayFor(m => m.Project.ProjectType)</dd>
 <dt class="col-sm-3">Abstract</dt><dd class="col-sm-9" style="white-space:pre-wrap">@Model.Project.Abstract</dd>
 <dt class="col-sm-3">Keywords</dt><dd class="col-sm-9">@Model.Project.Keywords</dd>
@@ -20,16 +19,17 @@
 <dt class="col-sm-3">Semester</dt><dd class="col-sm-9">@Model.Project.Semester</dd>
 <dt class="col-sm-3">Created (UTC)</dt><dd class="col-sm-9">@Model.Project.CreatedAt.ToString("u")</dd>
 <dt class="col-sm-3">Submitted (UTC)</dt><dd class="col-sm-9">@Model.Project.SubmittedAt?.ToString("u")</dd>
-</dl>
-<h2 class="h4">Resource Materials</h2>
+</dl></section>
+<section class="review-section"><h2 class="h4">Resource Materials</h2>
 @if (Model.Files.Count == 0) { <p class="alert alert-warning">No resources are attached to this legacy submission.</p> }
 else
 {
-<div class="table-responsive"><table class="table"><thead><tr><th>File</th><th>Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th>Action</th></tr></thead><tbody>
+<div class="table-responsive" tabindex="0" role="region" aria-label="Submission files"><table class="table"><thead><tr><th>File</th><th>Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th>Action</th></tr></thead><tbody>
 @foreach (var file in Model.Files) { <tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td><a asp-action="Download" asp-route-id="@file.Id">Download</a></td></tr> }
 </tbody></table></div>
 }
-<h2 class="h4 mt-4">Review</h2>
+</section>
+<section class="review-section"><h2 class="h4">Current Review</h2>
 <div asp-validation-summary="All" class="text-danger" role="alert"></div>
 @if (Model.WorkflowMessage is not null) { <p class="alert alert-warning">@Model.WorkflowMessage</p> }
 @if (Model.CanStart)
@@ -46,6 +46,7 @@ else
 <button class="btn btn-danger" type="submit" asp-action="Reject" asp-route-id="@Model.Project.Id">Reject</button>
 </form>
 }
-<partial name="_ReviewHistory" model="Model.History" />
+</section>
+<section class="review-section"><partial name="_ReviewHistory" model="Model.History" /></section>
 @await Component.InvokeAsync("SubmissionVersions", new { submissionId = Model.Project.Id })
 <a class="btn btn-secondary" asp-action="ReviewQueue">Back to Review Queue</a>

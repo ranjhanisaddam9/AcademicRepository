@@ -1,0 +1,46 @@
+@model PaginationViewModel
+@if (Model.TotalCount > 0)
+{
+    var routeValues = new Dictionary<string, string>(Model.RouteValues, StringComparer.OrdinalIgnoreCase)
+    {
+        ["pageSize"] = Model.PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)
+    };
+    <nav class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3" aria-label="@Model.Label pagination">
+        <span class="text-muted small">@Model.TotalCount.ToString("N0") results · Page @Model.PageNumber of @Model.TotalPages</span>
+        <ul class="pagination mb-0" aria-label="Pages">
+            @{
+        routeValues[Model.PageParameterName] = Math.Max(1, Model.PageNumber - 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+            <li class="page-item @(Model.HasPreviousPage ? "" : "disabled")">
+                @if (Model.HasPreviousPage) { <a class="page-link" asp-controller="@Model.Controller" asp-action="@Model.Action" asp-all-route-data="routeValues" aria-label="Previous page">Previous</a> }
+                else { <span class="page-link" aria-disabled="true">Previous</span> }
+            </li>
+            @{ var previous = 0; }
+            @foreach (var number in Model.PageNumbers)
+            {
+                if (previous > 0 && number - previous > 1) { <li class="page-item disabled"><span class="page-link" aria-hidden="true">…</span></li> }
+                routeValues[Model.PageParameterName] = number.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                <li class="page-item @(number == Model.PageNumber ? "active" : "")">
+                    @if (number == Model.PageNumber) { <span class="page-link" aria-current="page" aria-label="Page @number, current page">@number</span> }
+                    else { <a class="page-link" asp-controller="@Model.Controller" asp-action="@Model.Action" asp-all-route-data="routeValues" aria-label="Page @number">@number</a> }
+                </li>
+                previous = number;
+            }
+            @{ routeValues[Model.PageParameterName] = Math.Min(Model.TotalPages, Model.PageNumber + 1).ToString(System.Globalization.CultureInfo.InvariantCulture); }
+            <li class="page-item @(Model.HasNextPage ? "" : "disabled")">
+                @if (Model.HasNextPage) { <a class="page-link" asp-controller="@Model.Controller" asp-action="@Model.Action" asp-all-route-data="routeValues" aria-label="Next page">Next</a> }
+                else { <span class="page-link" aria-disabled="true">Next</span> }
+            </li>
+        </ul>
+        <div class="pagination-sizes" aria-label="Results per page">
+            <span class="small text-muted me-1">Rows:</span>
+            @foreach (var size in new[] { 10, 20, 50, 100 })
+            {
+                routeValues[Model.PageParameterName] = "1";
+                routeValues["pageSize"] = size.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (size == Model.PageSize) { <span class="btn btn-sm btn-primary" aria-label="Current page size: @size">@size</span> }
+                else { <a class="btn btn-sm btn-outline-secondary" asp-controller="@Model.Controller" asp-action="@Model.Action" asp-all-route-data="routeValues" aria-label="Show @size results per page">@size</a> }
+            }
+        </div>
+    </nav>
+}

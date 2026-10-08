@@ -7,7 +7,8 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace AcademicRepository.Controllers;
 
-public class AccountController(SignInManager<ApplicationUser> signInManager, AuthenticationCodeService codes) : Controller
+public class AccountController(SignInManager<ApplicationUser> signInManager, AuthenticationCodeService codes,
+    UserManager<ApplicationUser> users, ILogger<AccountController> logger) : Controller
 {
     private const string SentMessage = "If an eligible active account exists, a verification code has been sent. Check your email. Resends are subject to a cooldown.";
     [AllowAnonymous, HttpGet]
@@ -19,7 +20,15 @@ public class AccountController(SignInManager<ApplicationUser> signInManager, Aut
         if (!ModelState.IsValid) return View(model);
         var result = await signInManager.PasswordSignInAsync(model.Email.Trim(), model.Password, model.RememberMe, lockoutOnFailure: true);
         if (result.Succeeded)
+        {
+            var user = await users.FindByNameAsync(model.Email.Trim());
+            var roles = user is null ? Array.Empty<string>() : (await users.GetRolesAsync(user)).ToArray();
+            logger.LogInformation("Authentication completed. Action={Action} UserId={UserId} Role={Role} Result={Result}",
+                "StaffPasswordLogin", user?.Id, string.Join(",", roles), "Success");
             return Url.IsLocalUrl(model.ReturnUrl) ? LocalRedirect(model.ReturnUrl!) : RedirectToAction("Index", "Home");
+        }
+        logger.LogWarning("Authentication failed. Action={Action} Role={Role} Result={Result}",
+            "StaffPasswordLogin", "Staff", result.IsLockedOut ? "LockedOut" : "InvalidCredentials");
         ModelState.AddModelError("", result.IsLockedOut ? "Account temporarily locked. Try again later." : "Invalid login attempt.");
         return View(model);
     }
@@ -102,6 +111,11 @@ public class AccountController(SignInManager<ApplicationUser> signInManager, Aut
     [Authorize, HttpPost]
     public async Task<IActionResult> Logout()
     {
+        var userId = users.GetUserId(User);
+        var user = userId is null ? null : await users.FindByIdAsync(userId);
+        var roles = user is null ? Array.Empty<string>() : (await users.GetRolesAsync(user)).ToArray();
+        logger.LogInformation("Authentication completed. Action={Action} UserId={UserId} Role={Role} Result={Result}",
+            "Logout", userId, string.Join(",", roles), "Success");
         await signInManager.SignOutAsync();
         return RedirectToAction(nameof(Login));
     }

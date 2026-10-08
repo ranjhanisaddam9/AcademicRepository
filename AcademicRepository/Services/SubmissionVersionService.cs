@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AcademicRepository.Services;
 
-public sealed class SubmissionVersionService(ApplicationDbContext db, UserManager<ApplicationUser> users, IFileStorageService storage)
+public sealed class SubmissionVersionService(ApplicationDbContext db, UserManager<ApplicationUser> users, IFileStorageService storage,
+    ILogger<SubmissionVersionService> logger)
 {
     private async Task<ProjectSubmission> AuthorizeAsync(string userId, int submissionId)
     {
@@ -15,7 +16,14 @@ public sealed class SubmissionVersionService(ApplicationDbContext db, UserManage
         if (await users.IsInRoleAsync(user, "Coordinator")) query = query.Where(s => s.Status != SubmissionStatus.Draft);
         else if (await users.IsInRoleAsync(user, "Student")) query = query.Where(s => s.StudentId == userId);
         else throw new ReviewOperationException(403, "Student or Coordinator access is required.");
-        return await query.SingleOrDefaultAsync() ?? throw new ReviewOperationException(404, "Submission not found.");
+        var submission = await query.SingleOrDefaultAsync();
+        if (submission is null)
+        {
+            logger.LogWarning("Student or coordinator submission access unavailable. Action={Action} UserId={UserId} SubmissionId={SubmissionId} Result={Result}",
+                "AccessSubmissionVersion", userId, submissionId, "NotFoundOrOutsideScope");
+            throw new ReviewOperationException(404, "Submission not found.");
+        }
+        return submission;
     }
     public async Task<VersionHistoryViewModel> ListAsync(string userId, int submissionId)
     {
@@ -26,7 +34,12 @@ public sealed class SubmissionVersionService(ApplicationDbContext db, UserManage
     private async Task<SubmissionVersion> VersionAsync(string userId, int id)
     {
         var parent = await db.SubmissionVersions.Where(v => v.Id == id).Select(v => (int?)v.ProjectSubmissionId).SingleOrDefaultAsync();
-        if (parent is null) throw new ReviewOperationException(404, "Version not found.");
+        if (parent is null)
+        {
+            logger.LogWarning("Submission version access unavailable. Action={Action} UserId={UserId} VersionId={VersionId} Result={Result}",
+                "AccessSubmissionVersion", userId, id, "NotFound");
+            throw new ReviewOperationException(404, "Version not found.");
+        }
         await AuthorizeAsync(userId, parent.Value);
         return await db.SubmissionVersions.AsNoTracking().Include(v => v.Department).Include(v => v.ProjectSubmission.Student).SingleAsync(v => v.Id == id);
     }
@@ -47,8 +60,24 @@ public sealed class SubmissionVersionService(ApplicationDbContext db, UserManage
     {
         await VersionAsync(userId, versionId);
         var file = await db.SubmissionVersionFiles.Where(f => f.SubmissionVersionId == versionId && f.ProjectFileId == fileId).Select(f => f.ProjectFile).SingleOrDefaultAsync();
-        if (file is null) throw new ReviewOperationException(404, "Version resource not found.");
-        try { return (await storage.OpenReadAsync(file.StoredFileName), file.OriginalFileName, file.ContentType); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { throw new ReviewOperationException(404, "Historical resource is unavailable. Contact your administrator."); }
+        if (file is null)
+        {
+            logger.LogWarning("Historical resource access unavailable. Action={Action} UserId={UserId} VersionId={VersionId} FileId={FileId} Result={Result}",
+                "DownloadSubmissionVersionFile", userId, versionId, fileId, "NotFound");
+            throw new ReviewOperationException(404, "Version resource not found.");
+        }
+        try
+        {
+            var stream = await storage.OpenReadAsync(file.StoredFileName);
+            logger.LogInformation("Secure file access. Action={Action} UserId={UserId} Role={Role} VersionId={VersionId} FileId={FileId} Result={Result}",
+                "DownloadSubmissionVersionFile", userId, "StudentOrCoordinator", versionId, fileId, "Success");
+            return (stream, file.OriginalFileName, file.ContentType);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(ex, "Historical resource unavailable. Action={Action} UserId={UserId} VersionId={VersionId} FileId={FileId} Result={Result}",
+                "DownloadSubmissionVersionFile", userId, versionId, fileId, "Unavailable");
+            throw new ReviewOperationException(404, "Historical resource is unavailable. Contact your administrator.");
+        }
     }
 }

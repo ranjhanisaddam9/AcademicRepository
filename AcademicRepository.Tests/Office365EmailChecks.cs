@@ -46,7 +46,7 @@ internal static partial class IntegrationChecks
                     && !json.RootElement.GetProperty("saveToSentItems").GetBoolean(), "Graph OTP message recipient, purpose and content");
                 return new HttpResponseMessage(HttpStatusCode.Accepted);
             }));
-            await new AuthenticationEmailSender(http, Options.Create(settings), new EmailTestEnvironment { EnvironmentName = redirect ? "Development" : "Production" }, NullLogger<AuthenticationEmailSender>.Instance)
+            await new AuthenticationEmailSender(http, Options.Create(settings), new EmailTestEnvironment { EnvironmentName = redirect ? "Development" : "Production" })
                 .SendCodeAsync("CSC20F005@smiu.edu.pk", "123456", purpose, default);
             Check(requests == 2, "Office 365 token exchange and accepted send");
         }
@@ -59,7 +59,7 @@ internal static partial class IntegrationChecks
                 : new HttpResponseMessage(HttpStatusCode.Forbidden) { Content = new StringContent("sensitive-response-body") })));
             try
             {
-                await new AuthenticationEmailSender(http, Options.Create(settings), new EmailTestEnvironment(), NullLogger<AuthenticationEmailSender>.Instance)
+                await new AuthenticationEmailSender(http, Options.Create(settings), new EmailTestEnvironment())
                     .SendCodeAsync("recipient@smiu.edu.pk", "123456", CodePurpose.StudentLogin, default);
                 Check(false, "Failed Office 365 request must throw");
             }
@@ -74,7 +74,7 @@ internal static partial class IntegrationChecks
         Check(settings.HasValidDevelopmentRecipient(true) && !settings.HasValidDevelopmentRecipient(false), "Student recipient override is Development-only");
         try
         {
-            await new AuthenticationEmailSender(noNetwork, Options.Create(settings), new EmailTestEnvironment(), NullLogger<AuthenticationEmailSender>.Instance)
+            await new AuthenticationEmailSender(noNetwork, Options.Create(settings), new EmailTestEnvironment())
                 .SendCodeAsync("CSC20F005@smiu.edu.pk", "123456", CodePurpose.StudentLogin, default);
             Check(false, "Production must reject recipient override");
         }
@@ -85,11 +85,19 @@ internal static partial class IntegrationChecks
         settings.DevelopmentStudentRecipient = "outside@gmail.com";
         Check(!settings.HasValidDevelopmentRecipient(true), "Development recipient must be institutional");
         var development = new EmailOptions { DeliveryMode = "DevelopmentLog" };
-        await new AuthenticationEmailSender(noNetwork, Options.Create(development), new EmailTestEnvironment { EnvironmentName = "Development" }, NullLogger<AuthenticationEmailSender>.Instance)
-            .SendCodeAsync("recipient@smiu.edu.pk", "123456", CodePurpose.StudentLogin, default);
         try
         {
-            await new AuthenticationEmailSender(noNetwork, Options.Create(development), new EmailTestEnvironment(), NullLogger<AuthenticationEmailSender>.Instance)
+            await new AuthenticationEmailSender(noNetwork, Options.Create(development), new EmailTestEnvironment { EnvironmentName = "Development" })
+                .SendCodeAsync("recipient@smiu.edu.pk", "123456", CodePurpose.StudentLogin, default);
+            Check(false, "Development OTPs must not be written to logs");
+        }
+        catch (InvalidOperationException exception)
+        {
+            Check(exception.Message.Contains("Development OTP logging is disabled"), "Development delivery never logs or reports an OTP");
+        }
+        try
+        {
+            await new AuthenticationEmailSender(noNetwork, Options.Create(development), new EmailTestEnvironment())
                 .SendCodeAsync("recipient@smiu.edu.pk", "123456", CodePurpose.StudentLogin, default);
             Check(false, "Production must reject development delivery");
         }

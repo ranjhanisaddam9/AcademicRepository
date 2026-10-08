@@ -33,6 +33,16 @@ public sealed class EditSubmissionViewModel : CreateSubmissionViewModel
 
 public sealed record SubmissionListViewModel(int Id, string Title, ProjectType ProjectType, string Department,
     DateTime CreatedAt, DateTime? SubmittedAt, SubmissionStatus Status);
+public sealed class StudentSubmissionFilterViewModel
+{
+    [StringLength(200)] public string? Search { get; set; }
+    [EnumDataType(typeof(SubmissionStatus))] public SubmissionStatus? Status { get; set; }
+    public int Page { get; set; } = 1;
+    public int? PageSize { get; set; }
+    public string Sort { get; set; } = "CreatedAt";
+    public string Direction { get; set; } = "desc";
+}
+public sealed record StudentSubmissionListViewModel(PagedResult<SubmissionListViewModel> Results, StudentSubmissionFilterViewModel? Filter = null);
 
 public sealed record SubmissionDetailsViewModel(int Id, string Title, ProjectType ProjectType, SubmissionStatus Status,
     string StudentName, string Department, string Abstract, string Keywords, string? SupervisorName,

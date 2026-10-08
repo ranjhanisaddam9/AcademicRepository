@@ -1,22 +1,32 @@
 @model ReviewListViewModel
-@{ ViewData["Title"] = Model.QueueOnly ? "Review Queue" : "Department Submissions"; var action = Model.QueueOnly ? "ReviewQueue" : "Submissions"; }
+@{
+    ViewData["Title"] = Model.QueueOnly ? "Review Queue" : "Department Submissions";
+    var action = Model.QueueOnly ? "ReviewQueue" : "Submissions";
+    var filterModel = Model.Filter;
+    var statusOptions = new[] { new FilterOptionViewModel("", Model.QueueOnly ? "All in queue" : "All review statuses") }
+        .Concat(Enum.GetValues<SubmissionStatus>().Where(s => s is not (SubmissionStatus.Draft or SubmissionStatus.Revision) && (!Model.QueueOnly || s is SubmissionStatus.Submitted or SubmissionStatus.UnderReview)).Select(s => new FilterOptionViewModel(s.ToString(), s == SubmissionStatus.Submitted ? "Awaiting Review" : s == SubmissionStatus.UnderReview ? "Under Review" : s.ToString()))).ToArray();
+    var typeOptions = new[] { new FilterOptionViewModel("", "All types") }.Concat(Enum.GetValues<ProjectType>().Select(t => new FilterOptionViewModel(t.ToString(), t.ToString()))).ToArray();
+    var fields = new FilterFieldViewModel[]
+    {
+        new("Search", "Title, Student name or Student ID", filterModel.Search, "search", "Search department submissions", 200),
+        new("Status", "Status", filterModel.Status?.ToString() ?? "", "select", Options: statusOptions),
+        new("ProjectType", "Project Type", filterModel.ProjectType?.ToString() ?? "", "select", Options: typeOptions),
+        new("AcademicYear", "Academic Year", filterModel.AcademicYear, MaxLength: 30),
+        new("Semester", "Semester", filterModel.Semester, MaxLength: 50),
+        new("Sort", "Sort by", filterModel.Sort, "select", Options: new[] { new FilterOptionViewModel("SubmittedAt", "Submission date"), new("Title", "Title"), new("Student", "Student"), new("Status", "Status"), new("Type", "Project type") }),
+        new("Direction", "Direction", filterModel.Direction, "select", Options: new[] { new FilterOptionViewModel("desc", "Descending"), new("asc", "Ascending") })
+    };
+    var filter = new FilterPanelViewModel(action, "Coordinator", action, fields, Model.Results.PageSize);
+    var route = new Dictionary<string, string> { ["Status"] = filterModel.Status?.ToString() ?? "", ["ProjectType"] = filterModel.ProjectType?.ToString() ?? "", ["AcademicYear"] = filterModel.AcademicYear ?? "", ["Semester"] = filterModel.Semester ?? "", ["Search"] = filterModel.Search ?? "", ["Sort"] = filterModel.Sort, ["Direction"] = filterModel.Direction, ["pageSize"] = Model.Results.PageSize.ToString() };
+    var rows = Model.Items.Select(s => new DataTableRowViewModel(new DataTableCellViewModel[]
+    {
+        new(s.Title), new(s.StudentName), new(s.StudentNumber ?? "Not recorded"), new(s.ProjectType.ToString()), new(s.AcademicYear ?? "—"), new(s.Semester ?? "—"), new(s.SubmittedAt?.ToString("u") ?? "—"),
+        new(s.Status == SubmissionStatus.Submitted ? "Awaiting Review" : s.Status == SubmissionStatus.UnderReview ? "Under Review" : s.Status.ToString(), s.Status == SubmissionStatus.Approved ? "bg-success" : s.Status == SubmissionStatus.Rejected ? "bg-danger" : s.Status == SubmissionStatus.UnderReview ? "bg-primary" : "bg-info text-dark")
+    }, new[] { new DataTableActionViewModel("Open", Url.Action("Review", "Coordinator", new { id = s.Id }) ?? "#") })).ToArray();
+    var table = new DataTableViewModel(action, "Coordinator", new[] { new DataTableColumnViewModel("Title", "Title"), new("Student Name", "Student"), new("Student ID"), new("Project Type", "Type"), new("Academic Year"), new("Semester"), new("Submitted (UTC)", "SubmittedAt"), new("Status", "Status") }, rows, filterModel.Sort, filterModel.Direction, route, "No matching submissions", "No department submissions match these filters.", Url.Action(action, "Coordinator"));
+    var pagination = new PaginationViewModel(action, "Coordinator", Model.Results.PageNumber, Model.Results.PageSize, Model.Results.TotalCount, "Department submissions", route);
+}
 <h1>@ViewData["Title"]</h1><p class="lead">Department: @Model.Profile.Department</p>
-<form method="get" asp-action="@action" class="row g-2 mb-4">
-<div class="col-md-3"><label for="review-search" class="form-label">Title, Student Name or Student ID</label><input id="review-search" name="Search" value="@Model.Filter.Search" maxlength="200" class="form-control" /></div>
-<div class="col-md-2"><label for="review-status" class="form-label">Status</label><select id="review-status" name="Status" class="form-select"><option value="">All @(Model.QueueOnly ? "in queue" : "review statuses")</option>
-@foreach (var status in Enum.GetValues<SubmissionStatus>().Where(s => s is not (SubmissionStatus.Draft or SubmissionStatus.Revision) && (!Model.QueueOnly || s is SubmissionStatus.Submitted or SubmissionStatus.UnderReview)))
-{ <option value="@((int)status)" selected="@(Model.Filter.Status == status)">@(status == SubmissionStatus.Submitted ? "Awaiting Review" : status == SubmissionStatus.UnderReview ? "Under Review" : status.ToString())</option> }
-</select></div>
-<div class="col-md-2"><label for="review-type" class="form-label">Project Type</label><select id="review-type" name="ProjectType" class="form-select"><option value="">All types</option>
-@foreach (var type in Html.GetEnumSelectList<ProjectType>()) { <option value="@type.Value" selected="@(Model.Filter.ProjectType.HasValue && ((int)Model.Filter.ProjectType.Value).ToString() == type.Value)">@type.Text</option> }
-</select></div>
-<div class="col-md-2"><label for="review-year" class="form-label">Academic Year</label><input id="review-year" name="AcademicYear" value="@Model.Filter.AcademicYear" maxlength="30" class="form-control" /></div>
-<div class="col-md-2"><label for="review-semester" class="form-label">Semester</label><input id="review-semester" name="Semester" value="@Model.Filter.Semester" maxlength="50" class="form-control" /></div>
-<div class="col-md-1 d-flex align-items-end"><button class="btn btn-primary" type="submit">Filter</button></div>
-</form>
-<p>@Model.Total matching submissions · Page @Model.Filter.Page of @Model.PageCount</p>
-<partial name="_ReviewQueueTable" model="Model.Items" />
-<nav aria-label="Submission pages">
-@if (Model.Filter.Page > 1) { <a class="btn btn-outline-secondary" asp-action="@action" asp-route-Page="@(Model.Filter.Page - 1)" asp-route-Status="@Model.Filter.Status" asp-route-ProjectType="@Model.Filter.ProjectType" asp-route-AcademicYear="@Model.Filter.AcademicYear" asp-route-Semester="@Model.Filter.Semester" asp-route-Search="@Model.Filter.Search">Previous</a> }
-@if (Model.Filter.Page < Model.PageCount) { <a class="btn btn-outline-secondary" asp-action="@action" asp-route-Page="@(Model.Filter.Page + 1)" asp-route-Status="@Model.Filter.Status" asp-route-ProjectType="@Model.Filter.ProjectType" asp-route-AcademicYear="@Model.Filter.AcademicYear" asp-route-Semester="@Model.Filter.Semester" asp-route-Search="@Model.Filter.Search">Next</a> }
-</nav>
+<partial name="_FilterPanel" model="filter" />
+<partial name="_DataTable" model="table" />
+<partial name="_Pagination" model="pagination" />

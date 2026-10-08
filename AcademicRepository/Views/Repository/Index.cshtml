@@ -1,57 +1,37 @@
 @model RepositoryListViewModel
-@{ ViewData["Title"] = Model.Scope.Label; var repositoryController = Model.Scope.InstitutionWide ? "ORICQEC" : "Repository"; var listAction = Model.Scope.InstitutionWide ? "Repository" : "Index"; }
+@{
+    ViewData["Title"] = Model.Scope.Label;
+    var controller = Model.Scope.InstitutionWide ? "ORICQEC" : "Repository";
+    var action = Model.Scope.InstitutionWide ? "Repository" : "Index";
+    var typeOptions = new[] { new FilterOptionViewModel("", "All types") }.Concat(Enum.GetValues<ProjectType>().Select(t => new FilterOptionViewModel(((int)t).ToString(), t.ToString()))).ToArray();
+    var fields = new List<FilterFieldViewModel>
+    {
+        new("Search", Model.Scope.ExtendedSearch ? "Search title, abstract, keywords, Student or supervisor" : "Search title or keywords", Model.Filter.Search, "search", "Search repository", 200),
+        new("ProjectType", "Project Type", Model.Filter.ProjectType.HasValue ? ((int)Model.Filter.ProjectType.Value).ToString() : "", "select", Options: typeOptions),
+        new("AcademicYear", "Academic Year", Model.Filter.AcademicYear, Model.Scope.ExtendedSearch ? "select" : "text", MaxLength: 30,
+            Options: Model.Scope.ExtendedSearch ? new[] { new FilterOptionViewModel("", "All years") }.Concat((Model.AcademicYears ?? []).Select(y => new FilterOptionViewModel(y, y))).ToArray() : null),
+        new("Semester", "Semester", Model.Filter.Semester, MaxLength: 50),
+        new("Sort", "Sort by", ((int)Model.Filter.Sort).ToString(), "select", Options: new[] { new FilterOptionViewModel("0", "Newest approved"), new("1", "Oldest approved"), new("2", "Title A–Z"), new("3", "Title Z–A") })
+    };
+    if (Model.Scope.InstitutionWide) fields.Insert(1, new FilterFieldViewModel("DepartmentId", "Department", Model.Filter.DepartmentId?.ToString() ?? "", "select", Options: new[] { new FilterOptionViewModel("", "All departments") }.Concat((Model.Departments ?? []).Select(d => new FilterOptionViewModel(d.Id.ToString(), d.Name))).ToArray()));
+    if (Model.Scope.ExtendedSearch) fields.Add(new FilterFieldViewModel("Supervisor", "Supervisor", Model.Filter.Supervisor, MaxLength: 150));
+    var filter = new FilterPanelViewModel(action, controller, action, fields, Model.Results.PageSize, "Search");
+    var route = new Dictionary<string, string> { ["Search"] = Model.Filter.Search ?? "", ["DepartmentId"] = Model.Filter.DepartmentId?.ToString() ?? "", ["ProjectType"] = Model.Filter.ProjectType?.ToString() ?? "", ["AcademicYear"] = Model.Filter.AcademicYear ?? "", ["Semester"] = Model.Filter.Semester ?? "", ["Supervisor"] = Model.Filter.Supervisor ?? "", ["Sort"] = ((int)Model.Filter.Sort).ToString(), ["pageSize"] = Model.Results.PageSize.ToString() };
+    var pages = new PaginationViewModel(action, controller, Model.Results.PageNumber, Model.Results.PageSize, Model.Results.TotalCount, "Approved repository", route);
+    var rows = Model.Items.Select(item => new DataTableRowViewModel(new DataTableCellViewModel[]
+    {
+        new($"{item.Title} · Approved Version {item.VersionNumber}"), new(item.StudentName), new(item.StudentNumber ?? "Not recorded"), new(item.Department), new(item.ProjectType.ToString()), new(item.AcademicYear ?? "—"), new(item.Semester ?? "—"), new(item.Supervisor ?? "—"), new(item.ApprovedAt.ToString("u"))
+    }, new[] { new DataTableActionViewModel("View Details", Url.Action("Details", controller, new { id = item.SubmissionId }) ?? "#") })).ToArray();
+    var table = new DataTableViewModel(action, controller, new[] { new DataTableColumnViewModel("Title"), new("Student"), new("Student ID"), new("Department"), new("Project Type"), new("Academic Year"), new("Semester"), new("Supervisor"), new("Approved (UTC)") }, rows, Model.Filter.Sort.ToString(), "desc", route, "No approved projects match your filters", "Adjust the search criteria or return to the default repository listing.", Url.Action(action, controller));
+}
 <h1>@Model.Scope.Label</h1>
 <p>Approved Academic Repository · Results are limited to your authorized scope.</p>
-<form method="get" asp-controller="@repositoryController" asp-action="@listAction" class="row g-3 mb-4">
-<div class="col-md-4"><label for="repository-search" class="form-label">@(Model.Scope.ExtendedSearch ? "Search title, abstract, keywords, Student or supervisor" : "Search title or keywords")</label><input id="repository-search" name="Search" value="@Model.Filter.Search" maxlength="200" class="form-control" /></div>
+<partial name="_FilterPanel" model="filter" />
 @if (Model.Scope.InstitutionWide)
 {
-<div class="col-md-3"><label for="repository-department" class="form-label">Department</label><select id="repository-department" name="DepartmentId" class="form-select"><option value="">All Departments</option>
-@foreach (var department in Model.Departments ?? []) { <option value="@department.Id" selected="@(Model.Filter.DepartmentId == department.Id)">@department.Name</option> }
-</select></div>
+    <a class="btn btn-outline-success mb-3" asp-controller="ORICQEC" asp-action="Export" asp-all-route-data="route">Export CSV</a>
 }
-<div class="col-md-2"><label for="repository-type" class="form-label">Project Type</label><select id="repository-type" name="ProjectType" class="form-select"><option value="">All</option>
-@foreach (var type in Enum.GetValues<ProjectType>()) { <option value="@((int)type)" selected="@(Model.Filter.ProjectType == type)">@Html.DisplayFor(_ => type)</option> }
-</select></div>
-<div class="col-md-2"><label for="repository-year" class="form-label">Academic Year</label>
-@if (Model.Scope.ExtendedSearch)
-{
-<select id="repository-year" name="AcademicYear" class="form-select"><option value="">All</option>
-@foreach (var year in Model.AcademicYears ?? []) { <option value="@year" selected="@(Model.Filter.AcademicYear == year)">@year</option> }
-</select>
-}
-else { <input id="repository-year" name="AcademicYear" value="@Model.Filter.AcademicYear" maxlength="30" class="form-control" /> }
-</div>
-<div class="col-md-2"><label for="repository-semester" class="form-label">Semester</label><input id="repository-semester" name="Semester" value="@Model.Filter.Semester" maxlength="50" class="form-control" /></div>
-@if (Model.Scope.ExtendedSearch)
-{
-<div class="col-md-3"><label for="repository-supervisor" class="form-label">Supervisor</label><input id="repository-supervisor" name="Supervisor" value="@Model.Filter.Supervisor" maxlength="150" class="form-control" /></div>
-<div class="col-md-3"><label for="repository-sort" class="form-label">Sort</label><select id="repository-sort" name="Sort" class="form-select">
-<option value="0" selected="@(Model.Filter.Sort == RepositorySort.NewestApproved)">Newest Approved</option>
-<option value="1" selected="@(Model.Filter.Sort == RepositorySort.OldestApproved)">Oldest Approved</option>
-<option value="2" selected="@(Model.Filter.Sort == RepositorySort.TitleAZ)">Title A-Z</option>
-<option value="3" selected="@(Model.Filter.Sort == RepositorySort.TitleZA)">Title Z-A</option>
-</select></div>
-}
-<div class="col-md-2 align-self-end"><button class="btn btn-primary" type="submit">Search</button> <a asp-controller="@repositoryController" asp-action="@listAction">Clear</a></div>
-</form>
-@if (Model.Scope.InstitutionWide)
-{
-<a class="btn btn-outline-success mb-3" asp-controller="ORICQEC" asp-action="Export" asp-route-Search="@Model.Filter.Search" asp-route-DepartmentId="@Model.Filter.DepartmentId" asp-route-ProjectType="@Model.Filter.ProjectType" asp-route-AcademicYear="@Model.Filter.AcademicYear" asp-route-Semester="@Model.Filter.Semester" asp-route-Supervisor="@Model.Filter.Supervisor" asp-route-Sort="@((int)Model.Filter.Sort)">Export CSV</a>
-}
-@if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Some approved records in your scope are incomplete or unavailable and have been withheld. Contact your administrator.</p> }
+@if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Some approved records in your scope do not meet the required review and version integrity checks and have been withheld. Contact your administrator.</p> }
 <p>@Model.MatchingRecords matching approved records · Page @Model.Filter.Page of @Model.PageCount</p>
-@if (Model.Items.Count == 0) { <p>No approved projects found on this page.</p> }
-else
-{
-<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Title</th><th>Student</th><th>Student ID</th><th>Department</th><th>Project Type</th><th>Academic Year</th><th>Semester</th><th>Supervisor</th><th>Approved (UTC)</th><th></th></tr></thead><tbody>
-@foreach (var item in Model.Items)
-{
-<tr><td>@item.Title<br /><small>Approved Version @item.VersionNumber</small></td><td>@item.StudentName</td><td>@(item.StudentNumber ?? "Not recorded")</td><td>@item.Department</td><td>@Html.DisplayFor(_ => item.ProjectType)</td><td>@item.AcademicYear</td><td>@item.Semester</td><td>@item.Supervisor</td><td>@item.ApprovedAt.ToString("u")</td><td><a asp-controller="@repositoryController" asp-action="Details" asp-route-id="@item.SubmissionId">View Details</a></td></tr>
-}
-</tbody></table></div>
-}
-<nav aria-label="Repository pages">
-@if (Model.Filter.Page > 1) { <a class="btn btn-outline-primary" asp-controller="@repositoryController" asp-action="@listAction" asp-route-Page="@(Model.Filter.Page - 1)" asp-route-Search="@Model.Filter.Search" asp-route-DepartmentId="@Model.Filter.DepartmentId" asp-route-ProjectType="@Model.Filter.ProjectType" asp-route-AcademicYear="@Model.Filter.AcademicYear" asp-route-Semester="@Model.Filter.Semester" asp-route-Supervisor="@Model.Filter.Supervisor" asp-route-Sort="@((int)Model.Filter.Sort)">Previous</a> }
-@if (Model.Filter.Page < Model.PageCount) { <a class="btn btn-outline-primary" asp-controller="@repositoryController" asp-action="@listAction" asp-route-Page="@(Model.Filter.Page + 1)" asp-route-Search="@Model.Filter.Search" asp-route-DepartmentId="@Model.Filter.DepartmentId" asp-route-ProjectType="@Model.Filter.ProjectType" asp-route-AcademicYear="@Model.Filter.AcademicYear" asp-route-Semester="@Model.Filter.Semester" asp-route-Supervisor="@Model.Filter.Supervisor" asp-route-Sort="@((int)Model.Filter.Sort)">Next</a> }
-</nav>
+<partial name="_DataTable" model="table" />
+<partial name="_Pagination" model="pages" />

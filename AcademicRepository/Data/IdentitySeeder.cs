@@ -21,12 +21,15 @@ public static class IdentitySeeder
         if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(password)) return;
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             throw new InvalidOperationException("Configure both DevelopmentAdmin:Email and DevelopmentAdmin:Password using user secrets.");
+        email = email.Trim();
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await users.FindByEmailAsync(email);
         // Preserve legacy development accounts; they must be corrected manually before signing in.
         if (user is not null && !Services.InstitutionalEmail.IsValid(email)) return;
         if (user is null)
         {
+            if (!Services.InstitutionalEmail.IsValid(email))
+                throw new InvalidOperationException("DevelopmentAdmin:Email must be a valid @smiu.edu.pk address. Update it with 'dotnet user-secrets set \"DevelopmentAdmin:Email\" \"your-admin@smiu.edu.pk\" --project AcademicRepository'.");
             user = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true, FullName = "Development Administrator" };
             Ensure(await users.CreateAsync(user, password));
         }

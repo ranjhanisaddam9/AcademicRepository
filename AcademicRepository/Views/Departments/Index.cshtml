@@ -1,13 +1,22 @@
-@model IReadOnlyList<DepartmentListViewModel>
-@{ ViewData["Title"] = "Departments"; }
-<div class="d-flex justify-content-between align-items-center mb-3"><h1>Departments</h1><a class="btn btn-primary" asp-action="Create">Create Department</a></div>
-<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Code</th><th>Name</th><th>Student email code</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-@foreach (var department in Model)
-{
-    <tr><td>@department.Code</td><td>@department.Name</td><td>@department.StudentEmailKeyword</td><td>@(department.IsActive ? "Active" : "Inactive")</td><td>
-        <a asp-action="Details" asp-route-id="@department.Id">Details</a> | <a asp-action="Edit" asp-route-id="@department.Id">Edit</a>
-        <form class="d-inline ms-2" asp-action="SetActive" asp-route-id="@department.Id" method="post"><input type="hidden" name="isActive" value="@((!department.IsActive).ToString())" /><button class="btn btn-sm btn-outline-secondary">@(department.IsActive ? "Deactivate" : "Activate")</button></form>
-    </td></tr>
+@model DepartmentListPageViewModel
+@{
+    ViewData["Title"] = "Departments";
+    var page = Model.Page;
+    var filter = new FilterPanelViewModel("Index", "Departments", "Index", new[] { new FilterFieldViewModel("search", "Name, code or student email code", Model.Search, "search", "Search departments", 200) }, page.PageSize);
+    var route = new Dictionary<string, string> { ["search"] = Model.Search ?? "", ["sort"] = Model.Sort, ["direction"] = Model.Direction, ["pageSize"] = page.PageSize.ToString() };
+    var rows = page.Items.Select(d => new DataTableRowViewModel(new DataTableCellViewModel[]
+    {
+        new(d.Code), new(d.Name), new(d.StudentEmailKeyword), new(d.IsActive ? "Active" : "Inactive", d.IsActive ? "bg-success" : "bg-secondary")
+    }, new DataTableActionViewModel[]
+    {
+        new("Details", Url.Action("Details", "Departments", new { id = d.Id }) ?? "#"),
+        new("Edit", Url.Action("Edit", "Departments", new { id = d.Id }) ?? "#"),
+        new(d.IsActive ? "Deactivate" : "Activate", "#", "btn btn-sm btn-link text-start", "Departments", "SetActive", d.Id.ToString(), true, "isActive", (!d.IsActive).ToString().ToLowerInvariant())
+    })).ToArray();
+    var table = new DataTableViewModel("Index", "Departments", new[] { new DataTableColumnViewModel("Code", "Code"), new("Name", "Name"), new("Student email code"), new("Status", "Status") }, rows, Model.Sort, Model.Direction, route, "No departments found", "Try another search or create a department.", Url.Action("Index", "Departments"));
+    var pagination = new PaginationViewModel("Index", "Departments", page.PageNumber, page.PageSize, page.TotalCount, "Department", route);
 }
-</tbody></table></div>
-@if (Model.Count == 0) { <p>No departments yet.</p> }
+<div class="d-flex justify-content-between align-items-center mb-3"><h1>Departments</h1><a class="btn btn-primary" asp-action="Create">Create Department</a></div>
+<partial name="_FilterPanel" model="filter" />
+<partial name="_DataTable" model="table" />
+<partial name="_Pagination" model="pagination" />

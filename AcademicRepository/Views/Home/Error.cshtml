@@ -1,2 +1,9 @@
-@{ ViewData["Title"] = "Error"; }
-<h1>Unable to complete your request</h1><p>Please try again later or contact your administrator.</p>
+@model ErrorPageViewModel
+@{ ViewData["Title"] = "Something went wrong"; }
+<section class="error-page" role="alert">
+    <p class="text-uppercase text-muted fw-semibold">Request could not be completed</p>
+    <h1>Something went wrong.</h1>
+    <p class="lead">Please try again.</p>
+    <p class="error-reference">Error Reference: <code>@Model.CorrelationId</code></p>
+    @if (Model.IsAuthenticated) { <a class="btn btn-primary" asp-controller="Home" asp-action="Index">Return to Dashboard</a> }
+</section>

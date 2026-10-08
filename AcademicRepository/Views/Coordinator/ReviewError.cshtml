@@ -2,4 +2,5 @@
 @{ ViewData["Title"] = "Review unavailable"; }
 <h1>Unable to complete review operation</h1>
 <p class="alert alert-warning">@Model</p>
+<partial name="_ErrorReference" />
 <a asp-action="ReviewQueue" class="btn btn-secondary">Back to Review Queue</a>

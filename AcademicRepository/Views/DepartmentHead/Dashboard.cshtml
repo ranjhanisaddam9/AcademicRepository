@@ -1,26 +1,25 @@
 @model DepartmentRepositoryStats
 @{ ViewData["Title"] = "Department Head Dashboard"; }
-<h1>Department Head Dashboard</h1><h2>@Model.Department</h2>
-<p>Role: DepartmentHead · Read-only approved academic repository</p>
+<div class="page-heading mb-4"><h1>Department Head Dashboard</h1><p class="lead mb-0">@Model.Department · Read-only approved academic repository</p></div>
 <div class="row g-3 mb-4">
-<div class="col"><div class="card card-body"><span>Approved Repository Projects</span><strong data-insight="approved">@Model.Total</strong></div></div>
+<div class="col-6 col-lg-4 col-xxl-3"><div class="card card-body"><span>Approved Repository Projects</span><strong data-insight="approved">@Model.Total</strong></div></div>
 @foreach (var type in Enum.GetValues<ProjectType>())
 {
-<div class="col"><div class="card card-body"><span>@Html.DisplayFor(_ => type)</span><strong data-type="@((int)type)">@(Model.ProjectTypes.SingleOrDefault(t => t.Type == type)?.Count ?? 0)</strong></div></div>
+<div class="col-6 col-lg-4 col-xxl-3"><div class="card card-body"><span>@Html.DisplayFor(_ => type)</span><strong data-type="@((int)type)">@(Model.ProjectTypes.SingleOrDefault(t => t.Type == type)?.Count ?? 0)</strong></div></div>
 }
-<div class="col"><div class="card card-body"><span>Approved This Academic Year (@Model.CurrentAcademicYear)</span><strong data-insight="current-year">@Model.CurrentAcademicYearCount</strong></div></div>
+<div class="col-6 col-lg-4 col-xxl-3"><div class="card card-body"><span>Approved This Academic Year (@Model.CurrentAcademicYear)</span><strong data-insight="current-year">@Model.CurrentAcademicYearCount</strong></div></div>
 </div>
 <a class="btn btn-primary mb-4" asp-action="Repository">Academic Repository</a>
-@if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Some department approvals are incomplete or unavailable and are withheld from repository views.</p> }
-<h2 class="h4">Repository Insights</h2>
+@if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Some approved records have incomplete review or version data and are withheld from repository views.</p> }
+<section id="insights" class="section-card mb-4"><h2 class="h4">Repository Insights</h2>
 <p class="text-muted">Counts include approved records with valid submitted-version and resource snapshots. Physical resource availability is checked when repository entries are displayed or downloaded.</p>
-<div class="row"><div class="col-md-6"><h3 class="h5">Approved Projects by Academic Year</h3><table class="table"><thead><tr><th>Academic Year</th><th>Approved Projects</th></tr></thead><tbody>
+<div class="row g-3"><div class="col-lg-6"><h3 class="h5">Approved Projects by Academic Year</h3><div class="table-responsive" tabindex="0" role="region" aria-label="Approved projects by academic year"><table class="table"><thead><tr><th>Academic Year</th><th>Approved Projects</th></tr></thead><tbody>
 @foreach (var group in Model.AcademicYears) { <tr><td>@group.Label</td><td>@group.Count</td></tr> }
-</tbody></table></div><div class="col-md-6"><h3 class="h5">Approved Projects by Semester</h3><table class="table"><thead><tr><th>Semester</th><th>Approved Projects</th></tr></thead><tbody>
+</tbody></table></div></div><div class="col-lg-6"><h3 class="h5">Approved Projects by Semester</h3><div class="table-responsive" tabindex="0" role="region" aria-label="Approved projects by semester"><table class="table"><thead><tr><th>Semester</th><th>Approved Projects</th></tr></thead><tbody>
 @foreach (var group in Model.Semesters) { <tr><td>@group.Label</td><td>@group.Count</td></tr> }
-</tbody></table></div></div>
-<h2 class="h4">Recent Approved Projects</h2>
-@if (Model.Recent.Count == 0) { <p>No approved projects available.</p> }
+</tbody></table></div></div></div></section>
+<h2 class="h4 mb-3">Recent Approved Projects</h2>
+@if (Model.Recent.Count == 0) { <div class="empty-state"><span class="empty-state-icon" aria-hidden="true">◫</span><strong>No approved projects yet</strong><p>Approved projects for your department will appear here.</p></div> }
 @foreach (var item in Model.Recent)
 {
 <article class="card mb-3"><div class="card-body"><h3 class="h5"><a asp-controller="Repository" asp-action="Details" asp-route-id="@item.SubmissionId">@item.Title</a></h3><p class="mb-0">Student: @item.StudentName · Student ID: @item.StudentNumber · Approved (UTC): @item.ApprovedAt.ToString("u")</p></div></article>

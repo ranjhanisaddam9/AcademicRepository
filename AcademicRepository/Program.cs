@@ -1,7 +1,10 @@
 using AcademicRepository.Data;
 using AcademicRepository.Models;
 using AcademicRepository.Services;
+using AcademicRepository.Middleware;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -10,12 +13,19 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews(options => options.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute()));
+builder.Services.AddExceptionHandler<SafeExceptionHandler>();
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, StructuredAuthorizationResultHandler>();
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(
     builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("DefaultConnection is missing.")));
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.User.RequireUniqueEmail = true;
     options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Password.RequiredLength = 12;
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = true;
 }).AddEntityFrameworkStores<ApplicationDbContext>().AddDefaultTokenProviders().AddSignInManager<ActiveUserSignInManager>()
     .AddUserValidator<InstitutionalUserValidator>();
 builder.Services.AddOptions<AuthenticationCodeOptions>().BindConfiguration("AuthenticationCodes").ValidateDataAnnotations().ValidateOnStart();
@@ -47,6 +57,12 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = 20, Window = TimeSpan.FromHours(1), QueueLimit = 0, AutoReplenishment = true
         }));
+    options.AddPolicy("search", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
+        }));
 });
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<StudentSubmissionService>();
@@ -71,6 +87,9 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Account/AccessDenied";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = true;
     options.Events.OnValidatePrincipal = async context =>
     {
         var users = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
@@ -102,27 +121,28 @@ builder.Services.ConfigureApplicationCookie(options =>
 var app = builder.Build();
 _ = app.Services.GetRequiredService<IFileStorageService>();
 _ = app.Services.GetRequiredService<AuthenticationCodeHasher>();
+app.UseMiddleware<CorrelationIdMiddleware>();
+if (app.Environment.IsDevelopment()) app.UseDeveloperExceptionPage();
+else app.UseExceptionHandler("/Error");
+app.UseStatusCodePagesWithReExecute("/Error/Status", "?statusCode={0}");
 app.Use(async (context, next) =>
 {
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
-    // Existing Razor forms use an inline role-toggle script, so script-src is intentionally
-    // deferred until that script is externalized or nonce-based. These directives block
-    // framing, plugin content, hostile base URLs, and cross-origin form submissions meanwhile.
-    context.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'";
+    context.Response.Headers["Content-Security-Policy"] = "script-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'";
     await next();
 });
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllerRoute("default", "{controller=Home}/{action=Index}/{id?}");

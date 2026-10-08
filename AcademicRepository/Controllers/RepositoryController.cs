@@ -3,6 +3,7 @@ using AcademicRepository.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AcademicRepository.Controllers;
 
@@ -11,6 +12,7 @@ public sealed class RepositoryController(IRepositoryService repository, UserMana
 {
     private string UserId => users.GetUserId(User) ?? "";
     [HttpGet]
+    [EnableRateLimiting("search")]
     public Task<IActionResult> Index([FromQuery] RepositoryFilterViewModel filter) => RunAsync(async () =>
     {
         if (!ModelState.IsValid) throw new ReviewOperationException(400, "Choose valid repository search criteria.");
@@ -32,9 +34,9 @@ public sealed class RepositoryController(IRepositoryService repository, UserMana
         catch (ReviewOperationException ex) { Response.StatusCode = ex.Status; return View("Error", ex.Message); }
         catch (System.Data.Common.DbException ex)
         {
-            logger.LogError("Repository database unavailable ({ErrorType}).", ex.GetType().Name);
+            logger.LogError(ex, "Repository database request failed.");
             Response.StatusCode = 503;
-            return View("Error", "Repository services are temporarily unavailable.");
+            return View("Error", "We couldn't complete your request. Please try again.");
         }
     }
 }

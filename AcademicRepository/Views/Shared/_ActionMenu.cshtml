@@ -1,0 +1,33 @@
+@model IReadOnlyList<DataTableActionViewModel>
+@if (Model.Count == 1)
+{
+    @if (Model[0].IsPost)
+    {
+        <form asp-controller="@Model[0].Controller" asp-action="@Model[0].Action" asp-route-id="@Model[0].RouteId" method="post" class="d-inline">
+            @if (Model[0].HiddenName is not null) { <input type="hidden" name="@Model[0].HiddenName" value="@Model[0].HiddenValue" /> }
+            <button class="@Model[0].CssClass" type="submit">@Model[0].Label</button>
+        </form>
+    }
+    else { <a class="@Model[0].CssClass" href="@Model[0].Url">@Model[0].Label</a> }
+}
+else if (Model.Count > 1)
+{
+    <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            @foreach (var action in Model)
+            {
+                <li>
+                    @if (action.IsPost)
+                    {
+                        <form asp-controller="@action.Controller" asp-action="@action.Action" asp-route-id="@action.RouteId" method="post" class="px-2">
+                            @if (action.HiddenName is not null) { <input type="hidden" name="@action.HiddenName" value="@action.HiddenValue" /> }
+                            <button class="@action.CssClass" type="submit">@action.Label</button>
+                        </form>
+                    }
+                    else { <a class="@action.CssClass" href="@action.Url">@action.Label</a> }
+                </li>
+            }
+        </ul>
+    </div>
+}

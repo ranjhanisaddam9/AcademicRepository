@@ -28,6 +28,8 @@ public sealed class ProjectFilesController(ProjectFileService files, UserManager
         try
         {
             var file = await files.DownloadAsync(id, StudentId);
+            logger.LogInformation("Secure file access. Action={Action} UserId={UserId} Role={Role} FileId={FileId} Result={Result}",
+                "FileDownload", StudentId, "Student", id, "Success");
             Response.Headers["X-Content-Type-Options"] = "nosniff";
             Response.Headers.CacheControl = "no-store";
             return File(file.Stream, file.ContentType, file.Name);
@@ -54,7 +56,7 @@ public sealed class ProjectFilesController(ProjectFileService files, UserManager
     }
     private IActionResult DatabaseError(Exception exception)
     {
-        logger.LogError("Resource database operation unavailable ({ErrorType}).", exception.GetType().Name);
-        return Error(503, "Resource services are temporarily unavailable. Please try again.");
+        logger.LogError(exception, "Resource database request failed.");
+        return Error(503, "We couldn't complete your request. Please try again.");
     }
 }

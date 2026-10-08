@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 internal static partial class IntegrationChecks
 {
@@ -180,7 +181,8 @@ internal static partial class IntegrationChecks
         {
             await using var transaction = await failingDb.Database.BeginTransactionAsync();
             var locked = await new SubmissionLock(failingDb).OwnedAsync(multiId, owner.Id);
-            var workflow = new SubmissionWorkflowService(failingDb, users, new StudentDepartmentService(failingDb), new SubmissionLock(failingDb), storage, clock);
+            var workflow = new SubmissionWorkflowService(failingDb, users, new StudentDepartmentService(failingDb), new SubmissionLock(failingDb), storage, clock,
+                NullLogger<SubmissionWorkflowService>.Instance);
             await workflow.SubmitAsync(owner.Id, locked!);
             try { await failingDb.SaveChangesAsync(); Check(false, "Injected snapshot save must fail"); }
             catch (DbUpdateException) { await transaction.RollbackAsync(); }

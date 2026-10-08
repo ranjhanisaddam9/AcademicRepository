@@ -3,6 +3,7 @@ using AcademicRepository.Models;
 using AcademicRepository.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AcademicRepository.Controllers;
 
@@ -11,10 +12,15 @@ public sealed class ORICQECController(IRepositoryService repository, IRepository
 {
     private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
     [HttpGet]
-    public Task<IActionResult> Dashboard() => RunAsync(async () => View(await reports.GetInstitutionSummaryAsync(UserId)));
+    [EnableRateLimiting("search")]
+    public Task<IActionResult> Dashboard(int departmentPage = 1, int trendPage = 1, int? pageSize = null) =>
+        RunAsync(async () => View(await reports.GetInstitutionSummaryAsync(UserId, departmentPage, trendPage, pageSize)));
     [HttpGet]
-    public Task<IActionResult> Reports() => RunAsync(async () => View(await reports.GetInstitutionSummaryAsync(UserId)));
+    [EnableRateLimiting("search")]
+    public Task<IActionResult> Reports(int departmentPage = 1, int trendPage = 1, int? pageSize = null) =>
+        RunAsync(async () => View(await reports.GetInstitutionSummaryAsync(UserId, departmentPage, trendPage, pageSize)));
     [HttpGet]
+    [EnableRateLimiting("search")]
     public Task<IActionResult> Repository([FromQuery] RepositoryFilterViewModel filter) => RunAsync(async () =>
     {
         ValidateFilter();
@@ -32,6 +38,7 @@ public sealed class ORICQECController(IRepositoryService repository, IRepository
         return File(file.Stream, file.ContentType, file.Name);
     });
     [HttpGet]
+    [EnableRateLimiting("search")]
     public Task<IActionResult> Export([FromQuery] RepositoryFilterViewModel filter) => RunAsync(async () =>
     {
         ValidateFilter();
@@ -58,9 +65,9 @@ public sealed class ORICQECController(IRepositoryService repository, IRepository
         catch (ReviewOperationException ex) { Response.StatusCode = ex.Status; return View("~/Views/Repository/Error.cshtml", ex.Message); }
         catch (Exception ex) when (ex is System.Data.Common.DbException or IOException or UnauthorizedAccessException)
         {
-            logger.LogError("Institution repository services unavailable ({ErrorType}).", ex.GetType().Name);
+            logger.LogError(ex, "Institution repository request failed.");
             Response.StatusCode = 503;
-            return View("~/Views/Repository/Error.cshtml", "Institution repository services are temporarily unavailable.");
+            return View("~/Views/Repository/Error.cshtml", "We couldn't complete your request. Please try again.");
         }
     }
 }

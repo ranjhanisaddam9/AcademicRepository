@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace AcademicRepository.Controllers;
@@ -19,7 +20,17 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     private string StudentId => users.GetUserId(User) ?? "";
 
     [HttpGet("")]
-    public async Task<IActionResult> Index() => View(await submissions.ListAsync(StudentId));
+    [EnableRateLimiting("search")]
+    public async Task<IActionResult> Index([FromQuery] StudentSubmissionFilterViewModel filter)
+    {
+        if (filter.Search?.Length > 200 || (filter.Status.HasValue && !Enum.IsDefined(filter.Status.Value))) return BadRequest("Choose valid submission filters.");
+        filter.Search = filter.Search?.Trim();
+        filter.Sort = new[] { "Title", "Status", "Type", "CreatedAt" }.FirstOrDefault(s => string.Equals(s, filter.Sort, StringComparison.OrdinalIgnoreCase)) ?? "CreatedAt";
+        filter.Direction = string.Equals(filter.Direction, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
+        var results = await submissions.ListPageAsync(StudentId, filter);
+        filter.Page = results.PageNumber; filter.PageSize = results.PageSize;
+        return View(new StudentSubmissionListViewModel(results, filter));
+    }
 
     [HttpGet("Create")]
     public async Task<IActionResult> Create()
@@ -53,6 +64,8 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
             ModelState.AddModelError("", "Unable to save your submission. Your profile may have changed. Refresh and try again.");
             return View("Create", model);
         }
+        logger.LogInformation("Submission lifecycle event. Action={Action} UserId={UserId} DepartmentId={DepartmentId} SubmissionId={SubmissionId} Result={Result}",
+            "SubmissionCreated", student.Id, student.DepartmentId, submission.Id, "DraftCreated");
         return Saved(submission);
     }
 
@@ -64,7 +77,7 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
                 s.Student.FullName == "" ? s.Student.UserName ?? "Student" : s.Student.FullName, s.Department.Name,
                 s.Abstract, s.Keywords, s.SupervisorName, s.CourseName, s.CourseCode, s.AcademicYear, s.Semester,
                 s.CreatedAt, s.UpdatedAt, s.SubmittedAt)).SingleOrDefaultAsync();
-        if (model is null) return NotFound();
+        if (model is null) return NotFoundAccess(id, "SubmissionDetails");
         if (model.Status == SubmissionStatus.Rejected) ViewData["CanStartRevision"] = await workflow.CanStartRevisionAsync(StudentId, id);
         return View(model);
     }
@@ -73,11 +86,11 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     public async Task<IActionResult> Edit(int id)
     {
         var submission = await FindOwnedAsync(id);
-        if (submission is null) return NotFound();
+        if (submission is null) return NotFoundAccess(id, "EditSubmission");
         if (!SubmissionWorkflow.CanEdit(submission.Status)) return Locked();
         var student = await users.GetUserAsync(User);
         if (!await CanCreateAsync(student)) return Unavailable();
-        if (submission.Status == SubmissionStatus.Revision && submission.DepartmentId != student!.DepartmentId) return NotFound();
+        if (submission.Status == SubmissionStatus.Revision && submission.DepartmentId != student!.DepartmentId) return NotFoundAccess(id, "EditRevision");
         ViewData["Revision"] = submission.Status == SubmissionStatus.Revision;
         return View(new EditSubmissionViewModel
         {
@@ -93,12 +106,12 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     {
         await using var transaction = await db.Database.BeginTransactionAsync();
         var submission = await submissionLock.OwnedAsync(id, StudentId);
-        if (submission is null) return NotFound();
+        if (submission is null) return NotFoundAccess(id, "UpdateSubmission");
         if (!SubmissionWorkflow.CanEdit(submission.Status)) return Locked();
         if (!ValidToken(model.EditToken, submission)) return Changed();
         var student = await users.GetUserAsync(User);
         if (!await CanCreateAsync(student)) return Unavailable();
-        if (submission.Status == SubmissionStatus.Revision && submission.DepartmentId != student!.DepartmentId) return NotFound();
+        if (submission.Status == SubmissionStatus.Revision && submission.DepartmentId != student!.DepartmentId) return NotFoundAccess(id, "UpdateRevision");
         var revision = submission.Status == SubmissionStatus.Revision;
         ViewData["Revision"] = revision;
         if (revision)
@@ -111,6 +124,7 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
         if (intent == "Submit" && !await db.ProjectFiles.AnyAsync(f => f.ProjectSubmissionId == id && f.IsActive))
             ModelState.AddModelError("", "Please upload at least one resource file before submitting your project.");
         if (!ModelState.IsValid) return View(model);
+        var priorStatus = submission.Status;
         var now = DateTime.UtcNow;
         ApplyFields(submission, model);
         submission.DepartmentId = student!.DepartmentId!.Value;
@@ -125,9 +139,12 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
         catch (DbUpdateException exception)
         {
             logger.LogWarning(exception, "Unable to update submission {SubmissionId}.", id);
-            ModelState.AddModelError("", "Unable to save your submission. Refresh and try again.");
+            ModelState.AddModelError("", "We couldn't complete your request. Please try again.");
             return View(model);
         }
+        if (intent == "Submit")
+            logger.LogInformation("Submission lifecycle event. Action={Action} UserId={UserId} SubmissionId={SubmissionId} Result={Result}",
+                priorStatus == SubmissionStatus.Revision ? "ResubmissionCompleted" : "SubmissionSubmitted", StudentId, id, "Submitted");
         return Saved(submission);
     }
 
@@ -135,7 +152,7 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     public async Task<IActionResult> Delete(int id)
     {
         var submission = await FindOwnedAsync(id);
-        if (submission is null) return NotFound();
+        if (submission is null) return NotFoundAccess(id, "DeleteSubmissionForm");
         if (submission.Status != SubmissionStatus.Draft) return Locked();
         return View(new DeleteSubmissionViewModel { Title = submission.Title, EditToken = Token(submission) });
     }
@@ -145,7 +162,7 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     {
         await using var transaction = await db.Database.BeginTransactionAsync();
         var submission = await submissionLock.OwnedAsync(id, StudentId);
-        if (submission is null) return NotFound();
+        if (submission is null) return NotFoundAccess(id, "DeleteSubmission");
         if (submission.Status != SubmissionStatus.Draft) return Locked();
         if (!ValidToken(model.EditToken, submission)) return Changed();
         if (await db.ProjectFiles.AnyAsync(f => f.ProjectSubmissionId == id))
@@ -163,7 +180,7 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     {
         try { await workflow.StartRevisionAsync(StudentId, id); }
         catch (ReviewOperationException ex) { Response.StatusCode = ex.Status; return View("Message", ex.Message); }
-        catch (System.Data.Common.DbException) { Response.StatusCode = 503; return View("Message", "Submission services are temporarily unavailable."); }
+        catch (System.Data.Common.DbException exception) { logger.LogError(exception, "Student revision request failed for submission {SubmissionId}.", id); Response.StatusCode = 503; return View("Message", "We couldn't complete your request. Please try again."); }
         TempData["Status"] = "Revision started. Previous submitted versions and reviews are preserved.";
         return RedirectToAction(nameof(Edit), new { id });
     }
@@ -177,6 +194,11 @@ public class StudentSubmissionsController(ApplicationDbContext db, UserManager<A
     }
     private IActionResult Locked() => ConflictView("Only Draft or Revision submissions can be edited; only initial drafts can be deleted.");
     private IActionResult Changed() => ConflictView("This draft changed or was deleted while the page was open. Return to My Submissions and reload before continuing.");
+    private IActionResult NotFoundAccess(int id, string action)
+    {
+        logger.LogWarning("Student resource access unavailable. Action={Action} UserId={UserId} SubmissionId={SubmissionId} Result={Result}", action, StudentId, id, "NotFound");
+        return NotFound();
+    }
     private IActionResult ConflictView(string message)
     {
         Response.StatusCode = StatusCodes.Status409Conflict;

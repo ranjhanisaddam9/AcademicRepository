@@ -1,25 +1,23 @@
 @model InstitutionRepositoryReport
-@{ ViewData["Title"] = "ORIC / QEC Dashboard"; }
-<h1>ORIC / QEC Dashboard</h1><p>Welcome, @User.Identity?.Name</p>
-<p>Role: ORICQEC · Institution-wide Academic Repository Access · Read-only</p>
-<h2 class="h4">Academic Repository Overview</h2>
+@{ ViewData["Title"] = "ORIC / QEC Dashboard";
+   var departmentPagination = new PaginationViewModel("Dashboard", "ORICQEC", Model.DepartmentResults.PageNumber, Model.DepartmentResults.PageSize, Model.DepartmentResults.TotalCount, "Department comparison", new Dictionary<string, string> { ["trendPage"] = Model.ApprovalTrendResults.PageNumber.ToString() }) { PageParameterName = "departmentPage" }; }
+<div class="page-heading mb-4"><h1>ORIC / QEC Dashboard</h1><p class="lead mb-0">Institution-wide academic repository overview · Read-only</p></div>
 <div class="row g-3 mb-4">
-<div class="col"><div class="card card-body"><span>Total Approved Projects</span><strong data-insight="approved">@Model.Total</strong></div></div>
-<div class="col"><div class="card card-body"><span>Approved This Academic Year (@Model.CurrentAcademicYear)</span><strong data-insight="current-year">@Model.CurrentAcademicYearCount</strong></div></div>
-<div class="col"><div class="card card-body"><span>Active Departments</span><strong>@Model.ActiveDepartmentCount</strong></div></div>
+<div class="col-6 col-lg-4 col-xxl-3"><div class="card card-body"><span>Total Approved Projects</span><strong data-insight="approved">@Model.Total</strong></div></div>
+<div class="col-6 col-lg-4 col-xxl-3"><div class="card card-body"><span>Approved This Academic Year (@Model.CurrentAcademicYear)</span><strong data-insight="current-year">@Model.CurrentAcademicYearCount</strong></div></div>
+<div class="col-6 col-lg-4 col-xxl-3"><div class="card card-body"><span>Active Departments</span><strong>@Model.ActiveDepartmentCount</strong></div></div>
 @foreach (var type in Enum.GetValues<ProjectType>())
 {
-<div class="col"><div class="card card-body"><span>@Html.DisplayFor(_ => type)</span><strong data-type="@((int)type)">@(Model.ProjectTypes.SingleOrDefault(t => t.Type == type)?.Count ?? 0)</strong></div></div>
+<div class="col-6 col-lg-4 col-xxl-3"><div class="card card-body"><span>@Html.DisplayFor(_ => type)</span><strong data-type="@((int)type)">@(Model.ProjectTypes.SingleOrDefault(t => t.Type == type)?.Count ?? 0)</strong></div></div>
 }
 </div>
-@if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Incomplete or unavailable approved records have been withheld from repository statistics and reports. Contact your administrator.</p> }
+@if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Approved records with incomplete review or version data have been withheld from repository statistics and reports. Resource availability is checked when a project is opened or downloaded.</p> }
 <a class="btn btn-primary mb-3" asp-action="Repository">Academic Repository</a> <a class="btn btn-outline-primary mb-3" asp-action="Reports">Reports</a>
-<h2 class="h4">Approved Projects by Department</h2>
-<table class="table"><thead><tr><th>Department</th><th>Approved Projects</th></tr></thead><tbody>
+<section class="section-card mb-4"><h2 class="h4">Approved Projects by Department</h2><div class="table-responsive" tabindex="0" role="region" aria-label="Approved projects by department"><table class="table"><thead><tr><th>Department</th><th>Approved Projects</th></tr></thead><tbody>
 @foreach (var department in Model.Departments) { <tr><td>@department.Department</td><td>@department.Total</td></tr> }
-</tbody></table>
-<h2 class="h4">Recent Approvals</h2>
-@if (Model.Recent.Count == 0) { <p>No approved projects available.</p> }
+</tbody></table></div><partial name="_Pagination" model="departmentPagination" /></section>
+<h2 class="h4 mb-3">Recent Approvals</h2>
+@if (Model.Recent.Count == 0) { <div class="empty-state"><span class="empty-state-icon" aria-hidden="true">◫</span><strong>No approved projects yet</strong><p>Newly approved projects will appear here.</p></div> }
 @foreach (var item in Model.Recent)
 {
 <article class="card mb-3"><div class="card-body"><h3 class="h5"><a asp-action="Details" asp-route-id="@item.SubmissionId">@item.Title</a></h3><p class="mb-0">@item.Department · Student: @item.StudentName · Approved (UTC): @item.ApprovedAt.ToString("u")</p></div></article>

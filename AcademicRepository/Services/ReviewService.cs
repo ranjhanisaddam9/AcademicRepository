@@ -36,11 +36,26 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
     }
     private IQueryable<ProjectSubmission> DepartmentSubmissions(int departmentId) => db.ProjectSubmissions.AsNoTracking()
         .Where(s => s.DepartmentId == departmentId && (s.Status == SubmissionStatus.Submitted || s.Status == SubmissionStatus.UnderReview || s.Status == SubmissionStatus.Approved || s.Status == SubmissionStatus.Rejected));
-    private IQueryable<ReviewQueueItem> Rows(IQueryable<ProjectSubmission> query) => query
-        .OrderByDescending(s => s.SubmittedAt).ThenByDescending(s => s.Id)
+    private IQueryable<ReviewQueueItem> Rows(IQueryable<ProjectSubmission> query, string sort = "SubmittedAt", string direction = "desc")
+    {
+        query = (sort, direction) switch
+        {
+            ("Title", "asc") => query.OrderBy(s => s.Title).ThenBy(s => s.Id),
+            ("Title", _) => query.OrderByDescending(s => s.Title).ThenBy(s => s.Id),
+            ("Student", "asc") => query.OrderBy(s => s.Student.FullName).ThenBy(s => s.Id),
+            ("Student", _) => query.OrderByDescending(s => s.Student.FullName).ThenBy(s => s.Id),
+            ("Status", "asc") => query.OrderBy(s => s.Status).ThenBy(s => s.Id),
+            ("Status", _) => query.OrderByDescending(s => s.Status).ThenBy(s => s.Id),
+            ("Type", "asc") => query.OrderBy(s => s.ProjectType).ThenBy(s => s.Id),
+            ("Type", _) => query.OrderByDescending(s => s.ProjectType).ThenBy(s => s.Id),
+            ("SubmittedAt", "asc") => query.OrderBy(s => s.SubmittedAt).ThenBy(s => s.Id),
+            _ => query.OrderByDescending(s => s.SubmittedAt).ThenByDescending(s => s.Id)
+        };
+        return query
         .Select(s => new ReviewQueueItem(s.Id, s.Title, s.Student.FullName, s.Student.StudentNumber,
             s.ProjectType, s.AcademicYear, s.Semester, s.SubmittedAt, s.Status,
             db.SubmissionVersions.Where(v => v.ProjectSubmissionId == s.Id).Max(v => (int?)v.VersionNumber) ?? 0));
+    }
     public async Task<CoordinatorDashboardViewModel> GetCoordinatorDashboardAsync(string userId)
     {
         var profile = await CoordinatorAsync(userId);
@@ -55,8 +70,10 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
         var profile = await CoordinatorAsync(userId);
         if ((filter.Status.HasValue && !SubmissionWorkflow.CanDiscover(filter.Status.Value))
             || (filter.ProjectType.HasValue && !Enum.IsDefined(filter.ProjectType.Value)) || filter.Search?.Length > 200
-            || filter.AcademicYear?.Length > 30 || filter.Semester?.Length > 50 || filter.Page < 1)
+            || filter.AcademicYear?.Length > 30 || filter.Semester?.Length > 50)
             throw new ReviewOperationException(400, "Choose valid review filters. Drafts are private to Students.");
+        filter.Sort = new[] { "Title", "Student", "Status", "Type", "SubmittedAt" }.FirstOrDefault(s => string.Equals(s, filter.Sort, StringComparison.OrdinalIgnoreCase)) ?? "SubmittedAt";
+        filter.Direction = string.Equals(filter.Direction, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
         var query = DepartmentSubmissions(profile.DepartmentId);
         if (queueOnly) query = query.Where(s => s.Status == SubmissionStatus.Submitted || s.Status == SubmissionStatus.UnderReview);
         if (filter.Status.HasValue) query = query.Where(s => s.Status == filter.Status);
@@ -68,11 +85,10 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
             var search = filter.Search.Trim();
             query = query.Where(s => s.Title.Contains(search) || s.Student.FullName.Contains(search) || (s.Student.StudentNumber != null && s.Student.StudentNumber.Contains(search)));
         }
-        const int pageSize = 20;
-        var total = await query.CountAsync();
-        var pages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
-        filter.Page = Math.Min(filter.Page, pages);
-        return new(profile, filter, queueOnly, await Rows(query).Skip((filter.Page - 1) * pageSize).Take(pageSize).ToListAsync(), total, pages);
+        var results = await Rows(query, filter.Sort, filter.Direction).ToPagedResultAsync(filter.Page, filter.PageSize);
+        filter.Page = results.PageNumber;
+        filter.PageSize = results.PageSize;
+        return new(profile, filter, queueOnly, results);
     }
     private Task<List<ReviewHistoryItem>> HistoryAsync(int id) => db.SubmissionReviews.AsNoTracking().Where(r => r.ProjectSubmissionId == id)
         .OrderBy(r => r.ReviewRound).Select(r => new ReviewHistoryItem(r.ReviewRound, r.Reviewer.FullName, r.Decision, r.Comments, r.StartedAt, r.CompletedAt, r.SubmissionVersionId, r.SubmissionVersion == null ? null : (DateTime?)r.SubmissionVersion.SubmittedAt)).ToListAsync();
@@ -80,7 +96,12 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
     {
         var profile = await CoordinatorAsync(userId);
         var submission = await DepartmentSubmissions(profile.DepartmentId).Include(s => s.Student).Include(s => s.Department).SingleOrDefaultAsync(s => s.Id == id);
-        if (submission is null) throw new ReviewOperationException(404, "Submission not found.");
+        if (submission is null)
+        {
+            logger.LogWarning("Coordinator submission access unavailable. Action={Action} UserId={UserId} DepartmentId={DepartmentId} SubmissionId={SubmissionId} Result={Result}",
+                "OpenReview", userId, profile.DepartmentId, id, "NotFoundOrOutsideDepartment");
+            throw new ReviewOperationException(404, "Submission not found.");
+        }
         var active = await db.SubmissionReviews.AsNoTracking().SingleOrDefaultAsync(r => r.ProjectSubmissionId == id && r.Decision == ReviewDecision.Pending);
         var history = await HistoryAsync(id);
         string? message = submission.Status == SubmissionStatus.UnderReview && active is null
@@ -103,7 +124,12 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
         var profile = await CoordinatorAsync(userId);
         await using var transaction = await db.Database.BeginTransactionAsync();
         var submission = await submissionLock.DepartmentAsync(id, profile.DepartmentId);
-        if (submission is null) throw new ReviewOperationException(404, "Submission not found.");
+        if (submission is null)
+        {
+            logger.LogWarning("Coordinator submission access unavailable. Action={Action} UserId={UserId} DepartmentId={DepartmentId} SubmissionId={SubmissionId} Result={Result}",
+                "StartReview", userId, profile.DepartmentId, id, "NotFoundOrOutsideDepartment");
+            throw new ReviewOperationException(404, "Submission not found.");
+        }
         if (submission.Status != SubmissionStatus.Submitted || await db.SubmissionReviews.AnyAsync(r => r.ProjectSubmissionId == id && r.Decision == ReviewDecision.Pending))
             throw new ReviewOperationException(409, "This submission is no longer awaiting review. Reload its current status.");
         var round = (await db.SubmissionReviews.Where(r => r.ProjectSubmissionId == id).MaxAsync(r => (int?)r.ReviewRound) ?? 0) + 1;
@@ -116,7 +142,8 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
         submission.UpdatedAt = now;
         await SaveAsync();
         await transaction.CommitAsync();
-        logger.LogInformation("Coordinator {ReviewerId} started review of submission {SubmissionId}, round {Round}.", userId, id, round);
+        logger.LogInformation("Submission lifecycle event. Action={Action} UserId={UserId} Role={Role} DepartmentId={DepartmentId} SubmissionId={SubmissionId} Round={Round} Result={Result}",
+            "ReviewStarted", userId, "Coordinator", profile.DepartmentId, id, round, "UnderReview");
     }
     public Task ApproveAsync(string userId, int id, ReviewDecisionViewModel model) => CompleteAsync(userId, id, model, ReviewDecision.Approved);
     public Task RejectAsync(string userId, int id, ReviewDecisionViewModel model) => CompleteAsync(userId, id, model, ReviewDecision.Rejected);
@@ -125,7 +152,12 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
         var profile = await CoordinatorAsync(userId);
         await using var transaction = await db.Database.BeginTransactionAsync();
         var submission = await submissionLock.DepartmentAsync(id, profile.DepartmentId);
-        if (submission is null) throw new ReviewOperationException(404, "Submission not found.");
+        if (submission is null)
+        {
+            logger.LogWarning("Coordinator submission access unavailable. Action={Action} UserId={UserId} DepartmentId={DepartmentId} SubmissionId={SubmissionId} Result={Result}",
+                decision == ReviewDecision.Approved ? "ApproveSubmission" : "RejectSubmission", userId, profile.DepartmentId, id, "NotFoundOrOutsideDepartment");
+            throw new ReviewOperationException(404, "Submission not found.");
+        }
         if (submission.Status != SubmissionStatus.UnderReview) throw new ReviewOperationException(409, "This submission is not under review. A completed decision cannot be changed.");
         var review = await db.SubmissionReviews.SingleOrDefaultAsync(r => r.ProjectSubmissionId == id && r.Decision == ReviewDecision.Pending);
         if (review is null) throw new ReviewOperationException(409, "No active review exists. Contact your administrator.");
@@ -141,14 +173,15 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
         submission.UpdatedAt = review.CompletedAt;
         await SaveAsync();
         await transaction.CommitAsync();
-        logger.LogInformation("Coordinator {ReviewerId} recorded {Decision} for submission {SubmissionId}.", userId, decision, id);
+        logger.LogInformation("Submission lifecycle event. Action={Action} UserId={UserId} Role={Role} DepartmentId={DepartmentId} SubmissionId={SubmissionId} Result={Result}",
+            decision == ReviewDecision.Approved ? "ReviewApproved" : "ReviewRejected", userId, "Coordinator", profile.DepartmentId, id, decision.ToString());
     }
     private async Task SaveAsync()
     {
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException ex)
         {
-            logger.LogWarning("Review persistence conflict ({ErrorType}).", ex.GetType().Name);
+            logger.LogWarning(ex, "Review persistence conflict. Result={Result}", "Conflict");
             throw new ReviewOperationException(409, "The review changed or could not be saved. Reload the page before trying again.");
         }
     }
@@ -170,7 +203,7 @@ public sealed class ReviewService(ApplicationDbContext db, UserManager<Applicati
         try { return (await storage.OpenReadAsync(file.StoredFileName), file.OriginalFileName, file.ContentType); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            logger.LogWarning("Review resource {FileId} unavailable ({ErrorType}).", fileId, ex.GetType().Name);
+            logger.LogWarning(ex, "Review resource unavailable. FileId={FileId} Result={Result}", fileId, "Unavailable");
             throw new ReviewOperationException(404, "Resource is currently unavailable. Contact your administrator.");
         }
     }

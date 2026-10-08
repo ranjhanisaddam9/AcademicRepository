@@ -7,7 +7,7 @@
 </select>
 <div id="department-help" class="form-text">Your department is assigned by the university and cannot be changed here.</div>
 </div>
-<p class="text-muted">Title and project type are required for a draft. Abstract and keywords are also required when submitting.</p>
+<p class="form-text mb-3">Title and project type are required for a draft. Abstract and keywords are also required when submitting.</p>
 @if (ViewData["Revision"] is true)
 {
 <div class="mb-3"><label class="form-label">Project Type</label><select class="form-select" disabled><option selected>@Model.ProjectType</option></select><input asp-for="ProjectType" type="hidden" /><div class="form-text">Project type is locked after the first submission.</div></div>

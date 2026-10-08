@@ -2,4 +2,5 @@
 @{ ViewData["Title"] = "Resource unavailable"; }
 <h1>Unable to complete resource operation</h1>
 <p class="alert alert-warning">@Model</p>
+<partial name="_ErrorReference" />
 <a asp-controller="StudentSubmissions" asp-action="Index" class="btn btn-secondary">Back to My Submissions</a>

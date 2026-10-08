@@ -1,6 +1,7 @@
 @model SubmissionStatus
 @{
-    var css = Model switch { SubmissionStatus.Draft => "bg-secondary", SubmissionStatus.Submitted => "bg-primary", SubmissionStatus.Approved => "bg-success", SubmissionStatus.Rejected => "bg-danger", _ => "bg-warning text-dark" };
+    var css = Model switch { SubmissionStatus.Draft => "bg-secondary", SubmissionStatus.Submitted => "bg-primary", SubmissionStatus.Approved => "bg-success", SubmissionStatus.Rejected => "bg-danger", SubmissionStatus.Revision => "bg-warning", _ => "bg-warning" };
     var label = Model == SubmissionStatus.UnderReview ? "Under Review" : Model.ToString();
 }
-<span class="badge @css">@label</span>
+@{ var badge = new StatusBadgeViewModel(label, $"status-badge {css}"); }
+<partial name="_StatusBadge" model="badge" />

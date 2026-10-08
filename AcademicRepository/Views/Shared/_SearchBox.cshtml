@@ -1,0 +1,7 @@
+@model SearchBoxViewModel
+@{
+    var id = $"filter-{Model.Name}";
+}
+<label for="@id" class="form-label">@Model.Label</label>
+<input id="@id" name="@Model.Name" value="@Model.Value" maxlength="@Model.MaxLength"
+       placeholder="@Model.Placeholder" type="search" class="form-control" autocomplete="off" />

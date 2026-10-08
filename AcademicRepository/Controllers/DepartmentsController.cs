@@ -2,6 +2,7 @@ using AcademicRepository.Data;
 using AcademicRepository.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace AcademicRepository.Controllers;
@@ -9,8 +10,29 @@ namespace AcademicRepository.Controllers;
 [Authorize(Roles = "Admin")]
 public class DepartmentsController(ApplicationDbContext db, ILogger<DepartmentsController> logger) : Controller
 {
-    public async Task<IActionResult> Index() => View(await db.Departments.AsNoTracking().OrderBy(d => d.Code)
-        .Select(d => new DepartmentListViewModel(d.Id, d.Code, d.Name, d.IsActive, d.StudentEmailKeyword ?? "Not configured")).ToListAsync());
+    [EnableRateLimiting("search")]
+    public async Task<IActionResult> Index(string? search = null, int page = 1, int? pageSize = null, string? sort = null, string? direction = null)
+    {
+        if (search?.Length > 200) return BadRequest("Search must be 200 characters or fewer.");
+        search = search?.Trim();
+        var query = db.Departments.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search)) query = query.Where(d => d.Name.Contains(search) || d.Code.Contains(search) || (d.StudentEmailKeyword != null && d.StudentEmailKeyword.Contains(search)));
+        sort = new[] { "Code", "Name", "Status" }.FirstOrDefault(s => string.Equals(s, sort, StringComparison.OrdinalIgnoreCase)) ?? "Code";
+        direction = string.Equals(direction, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+        query = (sort, direction) switch
+        {
+            ("Name", "desc") => query.OrderByDescending(d => d.Name).ThenBy(d => d.Id),
+            ("Name", _) => query.OrderBy(d => d.Name).ThenBy(d => d.Id),
+            ("Status", "desc") => query.OrderByDescending(d => d.IsActive).ThenBy(d => d.Code).ThenBy(d => d.Id),
+            ("Status", _) => query.OrderBy(d => d.IsActive).ThenBy(d => d.Code).ThenBy(d => d.Id),
+            ("Code", "desc") => query.OrderByDescending(d => d.Code).ThenBy(d => d.Id),
+            _ => query.OrderBy(d => d.Code).ThenBy(d => d.Id)
+        };
+        var rows = await query
+            .Select(d => new DepartmentListViewModel(d.Id, d.Code, d.Name, d.IsActive, d.StudentEmailKeyword ?? "Not configured"))
+            .ToPagedResultAsync(page, pageSize);
+        return View(new DepartmentListPageViewModel(rows, search, sort, direction));
+    }
 
     public async Task<IActionResult> Details(int id)
     {

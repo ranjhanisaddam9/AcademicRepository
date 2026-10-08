@@ -1,0 +1,35 @@
+@model FilterPanelViewModel
+<form method="get" asp-controller="@Model.Controller" asp-action="@Model.Action" class="filter-panel row g-2 mb-3 align-items-end">
+    @foreach (var field in Model.Fields)
+    {
+        <div class="col-12 col-sm-6 col-lg">
+            @if (field.Type == "search")
+            {
+                <partial name="_SearchBox" model="new SearchBoxViewModel(field.Name, field.Label, field.Value, field.Placeholder, field.MaxLength)" />
+            }
+            else if (field.Type == "select")
+            {
+                var id = $"filter-{field.Name}";
+                <label for="@id" class="form-label">@field.Label</label>
+                <select id="@id" name="@field.Name" class="form-select">
+                    @foreach (var option in field.Options ?? Array.Empty<FilterOptionViewModel>())
+                    {
+                        <option value="@option.Value" selected="@(field.Value == option.Value)">@option.Text</option>
+                    }
+                </select>
+            }
+            else
+            {
+                var id = $"filter-{field.Name}";
+                <label for="@id" class="form-label">@field.Label</label>
+                <input id="@id" name="@field.Name" value="@field.Value" maxlength="@field.MaxLength" placeholder="@field.Placeholder" class="form-control" />
+            }
+        </div>
+    }
+    <input type="hidden" name="page" value="1" />
+    <input type="hidden" name="pageSize" value="@Model.PageSize" />
+    <div class="col-12 col-lg-auto d-flex gap-2">
+        <button class="btn btn-primary" type="submit">@Model.SubmitLabel</button>
+        <a class="btn btn-outline-secondary" asp-controller="@Model.Controller" asp-action="@Model.ResetAction">Reset Filters</a>
+    </div>
+</form>

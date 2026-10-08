@@ -1,0 +1,10 @@
+@model StatusCodePageViewModel
+@{ ViewData["Title"] = Model.Title; }
+<section class="error-page" role="alert">
+    <p class="text-uppercase text-muted fw-semibold">Request @Model.StatusCode</p>
+    <h1>@Model.Title</h1>
+    <p class="lead">@Model.Message</p>
+    <p class="error-reference">Error Reference: <code>@Model.CorrelationId</code></p>
+    @if (Model.IsAuthenticated) { <a class="btn btn-primary" asp-controller="Home" asp-action="Index">Return to Dashboard</a> }
+    else { <a class="btn btn-outline-primary" asp-controller="Home" asp-action="Index">Return to sign in</a> }
+</section>

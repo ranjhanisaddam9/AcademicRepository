@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AcademicRepository.Controllers;
 
 [Authorize(Roles = "Student,Coordinator")]
-public sealed class SubmissionVersionsController(SubmissionVersionService versions, UserManager<ApplicationUser> users) : Controller
+public sealed class SubmissionVersionsController(SubmissionVersionService versions, UserManager<ApplicationUser> users, ILogger<SubmissionVersionsController> logger) : Controller
 {
     private string UserId => users.GetUserId(User) ?? "";
     [HttpGet("SubmissionVersions/{id:int}")]
@@ -24,6 +24,6 @@ public sealed class SubmissionVersionsController(SubmissionVersionService versio
     {
         try { return await action(); }
         catch (ReviewOperationException ex) { Response.StatusCode = ex.Status; return View("~/Views/Coordinator/ReviewError.cshtml", ex.Message); }
-        catch (System.Data.Common.DbException) { Response.StatusCode = 503; return View("~/Views/Coordinator/ReviewError.cshtml", "Version history is temporarily unavailable."); }
+        catch (System.Data.Common.DbException exception) { logger.LogError(exception, "Submission version database request failed."); Response.StatusCode = 503; return View("~/Views/Coordinator/ReviewError.cshtml", "We couldn't complete your request. Please try again."); }
     }
 }

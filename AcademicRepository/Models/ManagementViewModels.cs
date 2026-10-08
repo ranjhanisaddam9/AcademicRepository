@@ -16,6 +16,8 @@ public sealed class DepartmentFormViewModel
 }
 
 public sealed record DepartmentListViewModel(int Id, string Code, string Name, bool IsActive, string StudentEmailKeyword = "");
+public sealed record DepartmentListPageViewModel(PagedResult<DepartmentListViewModel> Page, string? Search = null,
+    string Sort = "Code", string Direction = "asc");
 public sealed record DepartmentDetailsViewModel(int Id, string Code, string Name, bool IsActive, DateTime CreatedAt, DateTime? UpdatedAt, int UserCount);
 
 public sealed class UserFormViewModel

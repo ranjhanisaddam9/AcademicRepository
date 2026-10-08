@@ -1,0 +1,39 @@
+@model DataTableViewModel
+@if (Model.Rows.Count == 0)
+{
+    <partial name="_EmptyState" model="new EmptyStateViewModel(Model.EmptyTitle, Model.EmptyMessage, Model.ResetUrl)" />
+}
+else
+{
+    <div class="table-responsive" tabindex="0" aria-label="Scrollable results table">
+        <table class="table table-striped table-hover align-middle">
+            <thead><tr>
+                @foreach (var column in Model.Columns)
+                {
+                    <th scope="col" aria-sort="@(column.SortKey == Model.Sort ? (Model.Direction == "asc" ? "ascending" : "descending") : "none")">
+                        @if (column.SortKey is not null)
+                        {
+                            var values = new Dictionary<string, string>(Model.RouteValues, StringComparer.OrdinalIgnoreCase) { ["sort"] = column.SortKey, ["direction"] = Model.Sort == column.SortKey && Model.Direction == "asc" ? "desc" : "asc", ["page"] = "1" };
+                            var url = Url.Action(Model.Action, Model.Controller, values);
+                            <a href="@url">@column.Title</a>
+                        }
+                        else { @column.Title }
+                    </th>
+                }
+                @if (Model.Rows.Any(r => r.Actions.Count > 0)) { <th scope="col"><span class="visually-hidden">Actions</span></th> }
+            </tr></thead>
+            <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        @foreach (var cell in row.Cells)
+                        {
+                            <td>@if (cell.BadgeClass is not null) { <span class="badge @cell.BadgeClass">@cell.Text</span> } else { @cell.Text }</td>
+                        }
+                        @if (row.Actions.Count > 0) { <td><partial name="_ActionMenu" model="row.Actions" /></td> }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

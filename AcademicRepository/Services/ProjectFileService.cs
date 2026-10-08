@@ -20,7 +20,8 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
         var department = await db.Users.Where(u => u.Id == studentId && u.IsActive).Select(u => u.DepartmentId).SingleOrDefaultAsync();
         if (submission is null || department is null || submission.DepartmentId != department)
         {
-            logger.LogWarning("Resource access denied for submission {SubmissionId}, user {UserId}.", submissionId, studentId);
+            logger.LogWarning("Cross-user or unavailable submission access. Action={Action} UserId={UserId} SubmissionId={SubmissionId} Result={Result}",
+                "AccessSubmissionResource", studentId, submissionId, "NotFoundOrNotOwned");
             throw new ResourceOperationException(404, "Submission or resource not found.");
         }
         return submission;
@@ -75,28 +76,34 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
             await db.SaveChangesAsync();
             commitStarted = true;
             await transaction.CommitAsync();
-            logger.LogInformation("Resource upload succeeded for submission {SubmissionId}, key {StorageKey}.", submissionId, key);
+            logger.LogInformation("Secure resource lifecycle event. Action={Action} UserId={UserId} SubmissionId={SubmissionId} Result={Result}",
+                "FileUploaded", studentId, submissionId, "Success");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DbUpdateException or System.Data.Common.DbException)
         {
             try { await transaction.RollbackAsync(); }
-            catch (System.Data.Common.DbException) { logger.LogError("Upload rollback could not be confirmed for submission {SubmissionId}.", submissionId); }
+            catch (System.Data.Common.DbException rollbackException) { logger.LogError(rollbackException, "Upload rollback could not be confirmed for submission {SubmissionId}.", submissionId); }
             if (key is not null && !commitStarted)
             {
                 try { await storage.DeleteAsync(key); }
                 catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
-                { logger.LogError("Upload cleanup failed for orphan key {StorageKey} ({ErrorType}).", key, cleanup.GetType().Name); }
+                { logger.LogError(cleanup, "File operation failed. Action={Action} SubmissionId={SubmissionId} Result={Result}", "UploadCleanup", submissionId, "OrphanCleanupFailed"); }
             }
-            if (commitStarted) logger.LogError("Upload commit outcome uncertain; retain and reconcile key {StorageKey} before cleanup.", key);
-            logger.LogError("Resource upload failed for submission {SubmissionId} ({ErrorType}).", submissionId, ex.GetType().Name);
-            throw new ResourceOperationException(503, "Unable to save the resource. Please try again or contact your administrator.");
+            if (commitStarted) logger.LogError("File operation outcome uncertain. Action={Action} SubmissionId={SubmissionId} Result={Result}", "UploadCommit", submissionId, "ReconciliationRequired");
+            logger.LogError(ex, "File operation failed. Action={Action} SubmissionId={SubmissionId} Result={Result}", "Upload", submissionId, "Failed");
+            throw new ResourceOperationException(503, "We couldn't complete your request. Please try again.");
         }
     }
     private async Task<ProjectFile> FileAsync(int id, string studentId, bool locked = false)
     {
         // Scope metadata before acquiring/opening any physical file.
         var file = await db.ProjectFiles.SingleOrDefaultAsync(f => f.Id == id && f.ProjectSubmission.StudentId == studentId);
-        if (file is null) throw new ResourceOperationException(404, "Resource not found.");
+        if (file is null)
+        {
+            logger.LogWarning("Cross-user or unavailable file access. Action={Action} UserId={UserId} FileId={FileId} Result={Result}",
+                "AccessProjectFile", studentId, id, "NotFoundOrNotOwned");
+            throw new ResourceOperationException(404, "Resource not found.");
+        }
         await AuthorizedAsync(file.ProjectSubmissionId, studentId, locked);
         return file;
     }
@@ -107,7 +114,7 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
         try { return (await storage.OpenReadAsync(file.StoredFileName), file.OriginalFileName, file.ContentType); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            logger.LogWarning("Resource {FileId} unavailable ({ErrorType}).", id, ex.GetType().Name);
+            logger.LogWarning(ex, "File operation failed. Action={Action} FileId={FileId} Result={Result}", "Download", id, "Unavailable");
             throw new ResourceOperationException(404, "The resource is currently unavailable. Contact your administrator.");
         }
     }
@@ -133,8 +140,8 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
         }
         catch (Exception ex) when (ex is DbUpdateException or System.Data.Common.DbException)
         {
-            logger.LogError("Resource record deletion failed for {FileId} ({ErrorType}).", id, ex.GetType().Name);
-            throw new ResourceOperationException(503, "Unable to delete the resource. Please try again.");
+            logger.LogError(ex, "File operation failed. Action={Action} FileId={FileId} Result={Result}", "DeleteRecord", id, "Failed");
+            throw new ResourceOperationException(503, "We couldn't complete your request. Please try again.");
         }
         if (historical) return parentId.Value;
         // DB-first removal never leaves a downloadable record pointing at deleted bytes.
@@ -142,10 +149,11 @@ public sealed class ProjectFileService(ApplicationDbContext db, IFileStorageServ
         try { await storage.DeleteAsync(file.StoredFileName); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            logger.LogError("Physical deletion failed for orphan key {StorageKey} ({ErrorType}).", file.StoredFileName, ex.GetType().Name);
-            throw new ResourceOperationException(503, "The resource was removed from the project, but storage cleanup failed. Contact your administrator.");
+            logger.LogError(ex, "File operation failed. Action={Action} FileId={FileId} Result={Result}", "DeleteStoredFile", id, "OrphanedFile");
+            throw new ResourceOperationException(503, "We couldn't complete your request. Please try again.");
         }
-        logger.LogInformation("Resource {FileId} deleted from submission {SubmissionId}.", id, parentId);
+        logger.LogInformation("Secure resource lifecycle event. Action={Action} UserId={UserId} SubmissionId={SubmissionId} FileId={FileId} Result={Result}",
+            "FileDeleted", studentId, parentId, id, "Success");
         return parentId.Value;
     }
 }

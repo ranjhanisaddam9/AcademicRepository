@@ -23,7 +23,7 @@ public sealed class OperationalSettingsService(ApplicationDbContext db, IConfigu
         ("OtpExpiryMinutes", "Lifetime of a student or staff verification code in minutes."),
         ("OtpMaxAttempts", "Maximum verification attempts for one code."),
         ("OtpResendCooldownSeconds", "Minimum time between code requests for one email."),
-        ("RepositoryPageSize", "Default repository results per page, from 10 to 100."),
+        ("RepositoryPageSize", "Default repository results per page: 10, 20, 50 or 100."),
         ("DefaultAcademicYear", "Current academic-year label used in repository summaries and future defaults."),
         ("ApplicationDisplayName", "Name displayed in the application header."),
         ("SupportEmail", "Institutional contact address shown to users.")
@@ -53,7 +53,7 @@ public sealed class OperationalSettingsService(ApplicationDbContext db, IConfigu
             OtpExpiryMinutes = Parse("OtpExpiryMinutes", otp.Value.ExpiryMinutes, 1, 30),
             OtpMaxAttempts = Parse("OtpMaxAttempts", otp.Value.MaxAttempts, 1, 10),
             OtpResendCooldownSeconds = Parse("OtpResendCooldownSeconds", otp.Value.ResendCooldownSeconds, 1, 600),
-            RepositoryPageSize = Parse("RepositoryPageSize", 20, 10, 100),
+            RepositoryPageSize = PageRequest.NormalizeSize(Parse("RepositoryPageSize", 20, 10, 100)),
             DefaultAcademicYear = Get("DefaultAcademicYear", configuration["Repository:CurrentAcademicYear"] ?? $"{yearStart}-{yearStart + 1}"),
             ApplicationDisplayName = Get("ApplicationDisplayName", configuration["Application:DisplayName"] ?? "Academic Project Repository"),
             SupportEmail = NullIfBlank(Get("SupportEmail", configuration["Application:SupportEmail"] ?? "")),

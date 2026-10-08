@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using AcademicRepository.Services;
 
@@ -15,9 +16,10 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
     StudentDepartmentService studentDepartments) : Controller
 {
     private readonly IDataProtector editProtector = protection.CreateProtector("AcademicRepository.UserEdits.v1");
-    public async Task<IActionResult> Index(string? search = null, string? role = null, int? departmentId = null, bool? isActive = null, int page = 1)
+    [EnableRateLimiting("search")]
+    public async Task<IActionResult> Index(string? search = null, string? role = null, int? departmentId = null, bool? isActive = null, int page = 1, int? pageSize = null, string? sort = null, string? direction = null)
     {
-        if (page < 1 || search?.Length > 200 || (role is not null && !IdentitySeeder.Roles.Contains(role)) || departmentId < 1)
+        if (search?.Length > 200 || (role is not null && !IdentitySeeder.Roles.Contains(role)) || departmentId < 1)
             return BadRequest("Choose valid user filters.");
         search = search?.Trim();
         var query = db.Users.AsNoTracking().AsQueryable();
@@ -28,12 +30,23 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
                 where assignment.UserId == u.Id && assignedRole.Name == role select assignment.UserId).Any());
         if (departmentId.HasValue) query = query.Where(u => u.DepartmentId == departmentId);
         if (isActive.HasValue) query = query.Where(u => u.IsActive == isActive);
-        const int pageSize = 20;
-        var total = await query.CountAsync();
-        var pageCount = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
-        page = Math.Min(page, pageCount);
-        var accounts = await query.Include(u => u.Department).OrderBy(u => u.FullName).ThenBy(u => u.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-        var ids = accounts.Select(u => u.Id).ToArray();
+        var allowedSorts = new[] { "Name", "Email", "StudentNumber", "CreatedAt" };
+        sort = allowedSorts.FirstOrDefault(s => string.Equals(s, sort, StringComparison.OrdinalIgnoreCase)) ?? "Name";
+        direction = string.Equals(direction, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+        query = (sort, direction) switch
+        {
+            ("Email", "desc") => query.OrderByDescending(u => u.Email).ThenBy(u => u.Id),
+            ("Email", _) => query.OrderBy(u => u.Email).ThenBy(u => u.Id),
+            ("StudentNumber", "desc") => query.OrderByDescending(u => u.StudentNumber).ThenBy(u => u.Id),
+            ("StudentNumber", _) => query.OrderBy(u => u.StudentNumber).ThenBy(u => u.Id),
+            ("CreatedAt", "desc") => query.OrderByDescending(u => u.CreatedAt).ThenBy(u => u.Id),
+            ("CreatedAt", _) => query.OrderBy(u => u.CreatedAt).ThenBy(u => u.Id),
+            ("Name", "desc") => query.OrderByDescending(u => u.FullName).ThenBy(u => u.Id),
+            _ => query.OrderBy(u => u.FullName).ThenBy(u => u.Id)
+        };
+        var accounts = await query.Include(u => u.Department)
+            .ToPagedResultAsync(page, pageSize);
+        var ids = accounts.Items.Select(u => u.Id).ToArray();
         var assignments = await (from assignment in db.UserRoles.AsNoTracking()
                                  join assignedRole in db.Roles on assignment.RoleId equals assignedRole.Id
                                  where ids.Contains(assignment.UserId) && IdentitySeeder.Roles.Contains(assignedRole.Name!)
@@ -42,14 +55,15 @@ public class UsersController(ApplicationDbContext db, UserManager<ApplicationUse
             .Select(d => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem(d.Name, d.Id.ToString())).ToListAsync();
         var items = new List<UserListItem>();
         var assignmentsByUser = assignments.GroupBy(a => a.UserId).ToDictionary(g => g.Key, g => g.Select(a => a.Name).ToArray());
-        foreach (var user in accounts)
+        foreach (var user in accounts.Items)
         {
             var userRoles = assignmentsByUser.GetValueOrDefault(user.Id) ?? Array.Empty<string>();
             items.Add(new(user.Id, user.FullName, user.Email ?? "", string.Join(", ", userRoles),
                 user.Department?.Name ?? "Not Assigned", user.IsActive, userRoles.Contains("Student") ? user.StudentNumber : null,
                 user.CreatedAt ?? DateTime.MinValue));
         }
-        return View(new UserListPageViewModel(items, page, pageCount, total, search, role, departmentId, isActive, departments));
+        return View(new UserListPageViewModel(new PagedResult<UserListItem>(items, accounts.PageNumber, accounts.PageSize, accounts.TotalCount),
+            search, role, departmentId, isActive, departments, sort, direction));
     }
 
     [HttpGet]

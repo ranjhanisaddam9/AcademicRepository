@@ -12,7 +12,8 @@ public static class SubmissionWorkflow
 }
 
 public sealed class SubmissionWorkflowService(ApplicationDbContext db, UserManager<ApplicationUser> users,
-    StudentDepartmentService departments, SubmissionLock locks, IFileStorageService storage, TimeProvider clock)
+    StudentDepartmentService departments, SubmissionLock locks, IFileStorageService storage, TimeProvider clock,
+    ILogger<SubmissionWorkflowService> logger)
 {
     public async Task<bool> CanStartRevisionAsync(string userId, int id)
     {
@@ -43,7 +44,13 @@ public sealed class SubmissionWorkflowService(ApplicationDbContext db, UserManag
         submission.Status = SubmissionStatus.Revision;
         submission.UpdatedAt = clock.GetUtcNow().UtcDateTime;
         try { await db.SaveChangesAsync(); await transaction.CommitAsync(); }
-        catch (DbUpdateException) { throw new ReviewOperationException(409, "The submission changed. Reload before starting revision."); }
+        catch (DbUpdateException exception)
+        {
+            logger.LogWarning(exception, "Revision start conflicted. Action={Action} UserId={UserId} SubmissionId={SubmissionId} Result={Result}", "RevisionStarted", userId, id, "Conflict");
+            throw new ReviewOperationException(409, "The submission changed. Reload before starting revision.");
+        }
+        logger.LogInformation("Submission lifecycle event. Action={Action} UserId={UserId} Role={Role} DepartmentId={DepartmentId} SubmissionId={SubmissionId} Result={Result}",
+            "RevisionStarted", userId, "Student", user.DepartmentId, id, "Revision");
     }
 
     // Caller holds the parent lock and transaction, and saves this snapshot with the transition.

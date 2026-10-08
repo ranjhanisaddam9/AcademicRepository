@@ -58,7 +58,7 @@ public sealed class AdminSystemService(ApplicationDbContext db,
         }
         catch (DbException ex)
         {
-            logger.LogWarning("Admin dashboard database queries failed ({ErrorType}).", ex.GetType().Name);
+            logger.LogWarning(ex, "Admin system operation failed. Action={Action} Result={Result}", "LoadDashboard", "DatabaseUnavailable");
             return new([], [new("Database unavailable; operational counts could not be loaded", 1)], false,
                 await StorageHealthyAsync(), GraphConfigured(), environment.EnvironmentName,
                 typeof(Program).Assembly.GetName().Version?.ToString() ?? "Unknown", clock.GetUtcNow().UtcDateTime);
@@ -71,7 +71,7 @@ public sealed class AdminSystemService(ApplicationDbContext db,
         try { settings = await operationalSettings.GetAsync(cancellationToken); }
         catch (DbException ex)
         {
-            logger.LogWarning("Administrative settings could not be loaded ({ErrorType}); using deployment defaults for health display.", ex.GetType().Name);
+            logger.LogWarning(ex, "Admin system operation failed. Action={Action} Result={Result}", "LoadOperationalSettings", "UsingDeploymentDefaults");
             settings = DeploymentDefaults();
         }
         var email = configuration.GetSection("Email").Get<EmailOptions>();
@@ -193,7 +193,8 @@ public sealed class AdminSystemService(ApplicationDbContext db,
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     issues.Add(new("Storage", file.Id.ToString(), $"Project '{file.Title}' (submission {file.ProjectSubmissionId}), file '{file.OriginalFileName}' is unavailable; submission status: {file.Status}."));
-                    logger.LogWarning("Diagnostic found missing ProjectFile {FileId} on submission {SubmissionId} ({ErrorType}).", file.Id, file.ProjectSubmissionId, ex.GetType().Name);
+                    logger.LogWarning(ex, "Admin diagnostic found unavailable file. Action={Action} FileId={FileId} SubmissionId={SubmissionId} Result={Result}",
+                        "CheckStoredFile", file.Id, file.ProjectSubmissionId, "Unavailable");
                 }
                 if (issues.Count >= 500) break;
             }
@@ -230,7 +231,7 @@ public sealed class AdminSystemService(ApplicationDbContext db,
     {
         try { return await db.Database.CanConnectAsync(cancellationToken); }
         catch (Exception ex) when (ex is System.Data.Common.DbException or InvalidOperationException)
-        { logger.LogWarning("Admin database health check failed ({ErrorType}).", ex.GetType().Name); return false; }
+        { logger.LogWarning(ex, "Admin system operation failed. Action={Action} Result={Result}", "CheckDatabaseHealth", "Unavailable"); return false; }
     }
 
     private async Task<bool> StorageHealthyAsync()
@@ -244,7 +245,7 @@ public sealed class AdminSystemService(ApplicationDbContext db,
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
-        { logger.LogWarning("Admin file-storage health check failed ({ErrorType}).", ex.GetType().Name); return false; }
+        { logger.LogWarning(ex, "Admin system operation failed. Action={Action} Result={Result}", "CheckStorageHealth", "Unavailable"); return false; }
         finally { try { if (File.Exists(probe)) File.Delete(probe); } catch (IOException) { } }
     }
 

@@ -1,21 +1,25 @@
 @model InstitutionRepositoryReport
-@{ ViewData["Title"] = "Institution Repository Reports"; }
+@{ ViewData["Title"] = "Institution Repository Reports";
+   var departmentPagination = new PaginationViewModel("Reports", "ORICQEC", Model.DepartmentResults.PageNumber, Model.DepartmentResults.PageSize, Model.DepartmentResults.TotalCount, "Department comparison", new Dictionary<string, string> { ["trendPage"] = Model.ApprovalTrendResults.PageNumber.ToString() }) { PageParameterName = "departmentPage" };
+   var trendPagination = new PaginationViewModel("Reports", "ORICQEC", Model.ApprovalTrendResults.PageNumber, Model.ApprovalTrendResults.PageSize, Model.ApprovalTrendResults.TotalCount, "Approval trend", new Dictionary<string, string> { ["departmentPage"] = Model.DepartmentResults.PageNumber.ToString() }) { PageParameterName = "trendPage" }; }
 <h1>Institution Repository Reports</h1>
-<p>Read-only reports from available approved-version records. Total approved projects: <strong data-insight="approved">@Model.Total</strong>.</p>
-@if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Incomplete or unavailable approved records are excluded. Contact your administrator.</p> }
+<p>Read-only reports from eligible approved-version records. Resource availability is checked when a project is opened or downloaded. Total approved projects: <strong data-insight="approved">@Model.Total</strong>.</p>
+@if (Model.HasUnavailableRecords) { <p class="alert alert-warning">Approved records with incomplete review or version data are excluded from these summaries. Resource availability is checked when a project is opened or downloaded.</p> }
 <p><a asp-action="Repository">Filter repository and export CSV</a> · <a asp-action="Export">Export all approved repository records</a></p>
 <h2 class="h4">Department Comparison</h2>
-<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Department</th><th>FYP</th><th>Semester</th><th>Research</th><th>Assignment</th><th>Total</th></tr></thead><tbody>
+<div class="table-responsive" tabindex="0" role="region" aria-label="Department comparison table"><table class="table table-striped"><thead><tr><th>Department</th><th>FYP</th><th>Semester</th><th>Research</th><th>Assignment</th><th>Total</th></tr></thead><tbody>
 @foreach (var row in Model.Departments) { <tr><td>@row.Department</td><td>@row.FinalYearProjects</td><td>@row.SemesterProjects</td><td>@row.ResearchProjects</td><td>@row.Assignments</td><td>@row.Total</td></tr> }
 </tbody></table></div>
-<div class="row"><div class="col-md-4"><h2 class="h4">Projects by Type</h2><table class="table"><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody>
+<partial name="_Pagination" model="departmentPagination" />
+<div class="row"><div class="col-md-4"><h2 class="h4">Projects by Type</h2><div class="table-responsive" tabindex="0" role="region" aria-label="Projects by type table"><table class="table"><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody>
 @foreach (var type in Enum.GetValues<ProjectType>()) { <tr><td>@Html.DisplayFor(_ => type)</td><td>@(Model.ProjectTypes.SingleOrDefault(t => t.Type == type)?.Count ?? 0)</td></tr> }
-</tbody></table></div><div class="col-md-4"><h2 class="h4">Projects by Academic Year</h2><table class="table"><thead><tr><th>Academic Year</th><th>Count</th></tr></thead><tbody>
+</tbody></table></div></div><div class="col-md-4"><h2 class="h4">Projects by Academic Year</h2><div class="table-responsive" tabindex="0" role="region" aria-label="Projects by academic year table"><table class="table"><thead><tr><th>Academic Year</th><th>Count</th></tr></thead><tbody>
 @foreach (var row in Model.AcademicYears) { <tr><td>@row.Label</td><td>@row.Count</td></tr> }
-</tbody></table></div><div class="col-md-4"><h2 class="h4">Projects by Semester</h2><table class="table"><thead><tr><th>Semester</th><th>Count</th></tr></thead><tbody>
+</tbody></table></div></div><div class="col-md-4"><h2 class="h4">Projects by Semester</h2><div class="table-responsive" tabindex="0" role="region" aria-label="Projects by semester table"><table class="table"><thead><tr><th>Semester</th><th>Count</th></tr></thead><tbody>
 @foreach (var row in Model.Semesters) { <tr><td>@row.Label</td><td>@row.Count</td></tr> }
-</tbody></table></div></div>
+</tbody></table></div></div></div>
 <h2 class="h4">Approval Trend</h2><p>Monthly counts use completed approval dates in UTC.</p>
-<table class="table"><thead><tr><th>Month</th><th>Approved Projects</th></tr></thead><tbody>
+<div class="table-responsive" tabindex="0" role="region" aria-label="Approval trend table"><table class="table"><thead><tr><th>Month</th><th>Approved Projects</th></tr></thead><tbody>
 @foreach (var row in Model.ApprovalTrend) { <tr><td>@row.Year-@row.Month.ToString("00")</td><td>@row.Count</td></tr> }
-</tbody></table>
+</tbody></table></div>
+<partial name="_Pagination" model="trendPagination" />

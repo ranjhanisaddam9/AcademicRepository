@@ -1,7 +1,7 @@
 @model EditSubmissionViewModel
 @{ var revision = ViewData["Revision"] is true; ViewData["Title"] = revision ? "Edit Revision" : "Edit Draft"; }
-<h1>@ViewData["Title"]</h1>
-<form asp-action="Edit" asp-route-id="@ViewContext.RouteData.Values["id"]" method="post" style="max-width:850px">
+<div class="page-heading mb-4"><h1>@ViewData["Title"]</h1><p class="text-muted mb-0">Update your project information and choose whether to save a draft or submit it.</p></div>
+<form asp-action="Edit" asp-route-id="@ViewContext.RouteData.Values["id"]" method="post" class="section-card" style="max-width:900px">
 <input asp-for="EditToken" type="hidden" />
 <partial name="_Fields" model="Model" />
 <button class="btn btn-secondary" name="intent" value="SaveDraft" type="submit">@(revision ? "Save Revision" : "Save Draft")</button>

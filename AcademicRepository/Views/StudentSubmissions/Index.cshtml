@@ -1,4 +1,29 @@
-@model IReadOnlyList<SubmissionListViewModel>
-@{ ViewData["Title"] = "My Submissions"; }
+@model StudentSubmissionListViewModel
+@{
+    ViewData["Title"] = "My Submissions";
+    var filterModel = Model.Filter ?? new StudentSubmissionFilterViewModel();
+    var filter = new FilterPanelViewModel("Index", "StudentSubmissions", "Index", new FilterFieldViewModel[]
+    {
+        new("Search", "Search title", filterModel.Search, "search", "Search my submissions", 200),
+        new("Status", "Status", filterModel.Status?.ToString() ?? "", "select", Options: new[] { new FilterOptionViewModel("", "All statuses") }.Concat(Enum.GetValues<SubmissionStatus>().Select(s => new FilterOptionViewModel(s.ToString(), s.ToString()))).ToArray())
+    }, Model.Results.PageSize);
+    var route = new Dictionary<string, string> { ["Search"] = filterModel.Search ?? "", ["Status"] = filterModel.Status?.ToString() ?? "", ["sort"] = filterModel.Sort, ["direction"] = filterModel.Direction, ["pageSize"] = Model.Results.PageSize.ToString() };
+    var rows = Model.Results.Items.Select(s => new DataTableRowViewModel(new DataTableCellViewModel[]
+    {
+        new(s.Title), new(s.ProjectType.ToString()), new(s.Department), new(s.CreatedAt.ToString("u")), new(s.SubmittedAt?.ToString("u") ?? "Not submitted"),
+        new(s.Status == SubmissionStatus.Submitted ? "Awaiting Review" : s.Status.ToString(), s.Status switch { SubmissionStatus.Approved => "bg-success", SubmissionStatus.Rejected => "bg-danger", SubmissionStatus.UnderReview => "bg-primary", SubmissionStatus.Submitted => "bg-info text-dark", SubmissionStatus.Revision => "bg-warning text-dark", _ => "bg-secondary" })
+    }, Actions(s))).ToArray();
+    IReadOnlyList<DataTableActionViewModel> Actions(SubmissionListViewModel s)
+    {
+        var actions = new List<DataTableActionViewModel> { new(s.Status == SubmissionStatus.Rejected ? "View Feedback" : "View", Url.Action("Details", "StudentSubmissions", new { id = s.Id }) ?? "#") };
+        if (s.Status is SubmissionStatus.Draft or SubmissionStatus.Revision) actions.Add(new(s.Status == SubmissionStatus.Revision ? "Edit / Resubmit" : "Edit", Url.Action("Edit", "StudentSubmissions", new { id = s.Id }) ?? "#"));
+        if (s.Status == SubmissionStatus.Draft) actions.Add(new("Delete", Url.Action("Delete", "StudentSubmissions", new { id = s.Id }) ?? "#"));
+        return actions;
+    }
+    var table = new DataTableViewModel("Index", "StudentSubmissions", new[] { new DataTableColumnViewModel("Title", "Title"), new("Type", "Type"), new("Department"), new("Created (UTC)", "CreatedAt"), new("Submitted (UTC)"), new("Status", "Status") }, rows, filterModel.Sort, filterModel.Direction, route, "No submissions match your filters", "Create a draft or reset filters to view your submissions.", Url.Action("Index", "StudentSubmissions"));
+    var pagination = new PaginationViewModel("Index", "StudentSubmissions", Model.Results.PageNumber, Model.Results.PageSize, Model.Results.TotalCount, "My submissions", route);
+}
 <div class="d-flex justify-content-between align-items-center mb-3"><h1>My Submissions</h1><a class="btn btn-primary" asp-action="Create">New Submission</a></div>
-<partial name="_SubmissionTable" model="Model" />
+<partial name="_FilterPanel" model="filter" />
+<partial name="_DataTable" model="table" />
+<partial name="_Pagination" model="pagination" />

@@ -2,7 +2,7 @@
 @if (Model.Count == 0) { <p>No matching submissions in your department.</p> }
 else
 {
-<div class="table-responsive"><table class="table"><thead><tr><th>Title</th><th>Student Name</th><th>Student ID</th><th>Project Type</th><th>Academic Year</th><th>Semester</th><th>Submitted (UTC)</th><th>Status</th><th>Action</th></tr></thead><tbody>
+<div class="table-responsive" tabindex="0" role="region" aria-label="Coordinator submission queue"><table class="table"><thead><tr><th>Title</th><th>Student Name</th><th>Student ID</th><th>Project Type</th><th>Academic Year</th><th>Semester</th><th>Submitted (UTC)</th><th>Status</th><th>Action</th></tr></thead><tbody>
 @foreach (var submission in Model)
 {
 <tr><td>@submission.Title<br /><small class="text-muted">@(submission.VersionNumber > 1 ? $"Resubmission · Version {submission.VersionNumber}" : submission.VersionNumber == 1 ? "Initial Submission · Version 1" : "Legacy · No version snapshot")</small></td><td>@submission.StudentName</td><td>@(submission.StudentNumber ?? "Not recorded")</td><td>@Html.DisplayFor(_ => submission.ProjectType)</td><td>@submission.AcademicYear</td><td>@submission.Semester</td><td>@submission.SubmittedAt?.ToString("u")</td><td><partial name="_SubmissionStatus" model="submission.Status" /></td><td><a asp-action="Review" asp-route-id="@submission.Id">Open</a></td></tr>

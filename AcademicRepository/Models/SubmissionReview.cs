@@ -28,7 +28,10 @@ public sealed class ReviewFilterViewModel
     [StringLength(30), Display(Name = "Academic Year")] public string? AcademicYear { get; set; }
     [StringLength(50)] public string? Semester { get; set; }
     [StringLength(200)] public string? Search { get; set; }
-    [Range(1, int.MaxValue)] public int Page { get; set; } = 1;
+    public int Page { get; set; } = 1;
+    public int? PageSize { get; set; }
+    [StringLength(30)] public string Sort { get; set; } = "SubmittedAt";
+    [StringLength(4)] public string Direction { get; set; } = "desc";
 }
 
 public sealed class ReviewDecisionViewModel
@@ -43,7 +46,12 @@ public sealed record ReviewQueueItem(int Id, string Title, string StudentName, s
 public sealed record CoordinatorDashboardViewModel(CoordinatorProfile Profile, int AwaitingReview, int UnderReview, int Approved,
     int Rejected, IReadOnlyList<ReviewQueueItem> Recent);
 public sealed record ReviewListViewModel(CoordinatorProfile Profile, ReviewFilterViewModel Filter, bool QueueOnly,
-    IReadOnlyList<ReviewQueueItem> Items, int Total, int PageCount);
+    PagedResult<ReviewQueueItem> Results)
+{
+    public IReadOnlyList<ReviewQueueItem> Items => Results.Items;
+    public int Total => Results.TotalCount;
+    public int PageCount => Results.TotalPages;
+}
 public sealed record ReviewHistoryItem(int ReviewRound, string ReviewerName, ReviewDecision Decision,
     string? Comments, DateTime StartedAt, DateTime? CompletedAt, int? VersionId = null, DateTime? SubmittedAt = null);
 public sealed record ReviewDetailsViewModel(SubmissionDetailsViewModel Project, string? StudentNumber, string Email,

@@ -8,33 +8,20 @@ namespace AcademicRepository.Services;
 
 public interface IRepositoryReportService
 {
-    Task<InstitutionRepositoryReport> GetInstitutionSummaryAsync(string userId);
+    Task<InstitutionRepositoryReport> GetInstitutionSummaryAsync(string userId, int departmentPage = 1, int trendPage = 1, int? pageSize = null);
     Task WriteCsvAsync(string userId, RepositoryFilterViewModel filter, Stream destination, CancellationToken cancellationToken = default);
 }
 
 public sealed class RepositoryReportService(ApplicationDbContext db, RepositoryService repository,
     IOperationalSettingsService operationalSettings) : IRepositoryReportService
 {
-    public async Task<InstitutionRepositoryReport> GetInstitutionSummaryAsync(string userId)
+    public async Task<InstitutionRepositoryReport> GetInstitutionSummaryAsync(string userId, int departmentPage = 1, int trendPage = 1, int? pageSize = null)
     {
         // Authorization and approved eligibility come from the repository's single source of truth.
         var query = await repository.InstitutionQueryAsync(userId, new());
         var inconsistent = await repository.HasInconsistentInstitutionRecordsAsync(userId);
-        // Validate private storage in bounded batches, retaining only unavailable version IDs.
-        // Aggregations remain database-side; no complete project entities are loaded.
-        var unavailable = new List<int>();
-        var cursor = 0;
-        while (true)
-        {
-            var batch = await query.Where(r => r.Id > cursor).OrderBy(r => r.Id)
-                .Select(r => new { r.Id, VersionId = r.SubmissionVersionId!.Value }).Take(200).ToListAsync();
-            if (batch.Count == 0) break;
-            var available = await repository.AvailableVersionIdsAsync(batch.Select(r => r.VersionId).ToArray());
-            unavailable.AddRange(batch.Where(r => !available.Contains(r.VersionId)).Select(r => r.VersionId));
-            cursor = batch[^1].Id;
-        }
-        inconsistent |= unavailable.Count > 0;
-        if (unavailable.Count > 0) query = query.Where(r => !unavailable.Contains(r.SubmissionVersionId!.Value));
+        // Report aggregates stay in SQL. Physical storage is validated only on details/download,
+        // rather than opening every repository resource while rendering a summary page.
         var total = await query.CountAsync();
         var types = await query.GroupBy(r => r.SubmissionVersion!.ProjectTypeSnapshot)
             .Select(g => new RepositoryTypeCount(g.Key, g.Count())).ToListAsync();
@@ -42,14 +29,19 @@ public sealed class RepositoryReportService(ApplicationDbContext db, RepositoryS
             .Select(g => new RepositoryGroupCount(g.Key ?? "Not recorded", g.Count())).ToListAsync();
         var semesters = await query.GroupBy(r => r.SubmissionVersion!.SemesterSnapshot).OrderBy(g => g.Key)
             .Select(g => new RepositoryGroupCount(g.Key ?? "Not recorded", g.Count())).ToListAsync();
+        var pageSizeValue = PageRequest.NormalizeSize(pageSize);
         var trend = await query.GroupBy(r => new { r.CompletedAt!.Value.Year, r.CompletedAt.Value.Month })
             .OrderBy(g => g.Key.Year).ThenBy(g => g.Key.Month)
-            .Select(g => new RepositoryApprovalTrend(g.Key.Year, g.Key.Month, g.Count())).ToListAsync();
-        var counts = await query.GroupBy(r => new { r.ProjectSubmission.DepartmentId, r.SubmissionVersion!.ProjectTypeSnapshot })
+            .Select(g => new RepositoryApprovalTrend(g.Key.Year, g.Key.Month, g.Count()))
+            .ToPagedResultAsync(trendPage, pageSizeValue);
+        var departmentPageData = await db.Departments.AsNoTracking().Where(d => d.IsActive || query.Any(r => r.ProjectSubmission.DepartmentId == d.Id))
+            .OrderBy(d => d.Name).ThenBy(d => d.Id).Select(d => new { d.Id, d.Name })
+            .ToPagedResultAsync(departmentPage, pageSizeValue);
+        var departmentIds = departmentPageData.Items.Select(d => d.Id).ToArray();
+        var counts = await query.Where(r => departmentIds.Contains(r.ProjectSubmission.DepartmentId))
+            .GroupBy(r => new { r.ProjectSubmission.DepartmentId, r.SubmissionVersion!.ProjectTypeSnapshot })
             .Select(g => new { g.Key.DepartmentId, Type = g.Key.ProjectTypeSnapshot, Count = g.Count() }).ToListAsync();
-        var departments = await db.Departments.AsNoTracking().Where(d => d.IsActive || query.Any(r => r.ProjectSubmission.DepartmentId == d.Id))
-            .OrderBy(d => d.Name).Select(d => new { d.Id, d.Name }).ToListAsync();
-        var comparisons = departments.Select(d => new RepositoryDepartmentComparison(d.Id, d.Name,
+        var comparisons = departmentPageData.Items.Select(d => new RepositoryDepartmentComparison(d.Id, d.Name,
             counts.Where(c => c.DepartmentId == d.Id && c.Type == ProjectType.Assignment).Sum(c => c.Count),
             counts.Where(c => c.DepartmentId == d.Id && c.Type == ProjectType.SemesterProject).Sum(c => c.Count),
             counts.Where(c => c.DepartmentId == d.Id && c.Type == ProjectType.FinalYearProject).Sum(c => c.Count),
@@ -61,7 +53,9 @@ public sealed class RepositoryReportService(ApplicationDbContext db, RepositoryS
                 r.SubmissionVersion.TitleSnapshot, r.ProjectSubmission.Student.FullName, r.ProjectSubmission.Student.StudentNumber,
                 r.SubmissionVersion.Department.Name, r.SubmissionVersion.ProjectTypeSnapshot, r.SubmissionVersion.AcademicYearSnapshot,
                 r.SubmissionVersion.SemesterSnapshot, r.SubmissionVersion.SupervisorNameSnapshot, r.SubmissionVersion.KeywordsSnapshot, r.CompletedAt!.Value)).ToListAsync();
-        return new(total, await db.Departments.CountAsync(d => d.IsActive), currentYear, currentCount, comparisons, types, years, semesters, trend, recent, inconsistent);
+        return new(total, await db.Departments.CountAsync(d => d.IsActive), currentYear, currentCount,
+            new PagedResult<RepositoryDepartmentComparison>(comparisons, departmentPageData.PageNumber, departmentPageData.PageSize, departmentPageData.TotalCount),
+            types, years, semesters, trend, recent, inconsistent);
     }
 
     public async Task WriteCsvAsync(string userId, RepositoryFilterViewModel filter, Stream destination, CancellationToken cancellationToken = default)

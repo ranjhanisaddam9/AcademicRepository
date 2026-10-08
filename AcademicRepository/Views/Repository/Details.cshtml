@@ -23,7 +23,7 @@
 <dt class="col-sm-3">Comments</dt><dd class="col-sm-9" style="white-space:pre-wrap">@(Model.ApprovalComments ?? "No comments provided.")</dd>
 </dl>
 <h2 class="h4">Approved Resource Materials</h2>
-<div class="table-responsive"><table class="table"><thead><tr><th>File</th><th>Resource Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th></th></tr></thead><tbody>
+<div class="table-responsive" tabindex="0" role="region" aria-label="Approved resource files"><table class="table"><thead><tr><th>File</th><th>Resource Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th></th></tr></thead><tbody>
 @foreach (var file in Model.Files) { <tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td><a asp-controller="@repositoryController" asp-action="Download" asp-route-id="@Model.SubmissionId" asp-route-versionId="@Model.VersionId" asp-route-fileId="@file.Id">Download</a></td></tr> }
 </tbody></table></div>
 <a class="btn btn-secondary" asp-controller="@repositoryController" asp-action="@(Model.InstitutionWide ? "Repository" : "Index")">Back to Approved Projects</a>

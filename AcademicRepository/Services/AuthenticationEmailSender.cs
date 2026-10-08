@@ -42,8 +42,7 @@ public interface IAuthenticationEmailSender
     Task SendCodeAsync(string email, string code, CodePurpose purpose, CancellationToken cancellationToken);
 }
 
-public sealed class AuthenticationEmailSender(HttpClient httpClient, IOptions<EmailOptions> options, IWebHostEnvironment environment,
-    ILogger<AuthenticationEmailSender> logger) : IAuthenticationEmailSender
+public sealed class AuthenticationEmailSender(HttpClient httpClient, IOptions<EmailOptions> options, IWebHostEnvironment environment) : IAuthenticationEmailSender
 {
     public async Task SendCodeAsync(string email, string code, CodePurpose purpose, CancellationToken cancellationToken)
     {
@@ -55,8 +54,7 @@ public sealed class AuthenticationEmailSender(HttpClient httpClient, IOptions<Em
         if (settings.DeliveryMode == "DevelopmentLog")
         {
             if (!environment.IsDevelopment()) throw new InvalidOperationException("Development OTP delivery is forbidden outside Development.");
-            logger.LogInformation("DEVELOPMENT ONLY: {Purpose} code for {Email}: {Code}", purpose, email, code);
-            return;
+            throw new InvalidOperationException("Development OTP logging is disabled. Configure Microsoft Graph or a private test email sender.");
         }
         if (!settings.HasValidGraphConfiguration())
             throw new InvalidOperationException("Configure Microsoft Graph TenantId, ClientId, ClientSecret and From for authentication email.");

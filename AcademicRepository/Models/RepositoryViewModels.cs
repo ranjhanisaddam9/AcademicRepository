@@ -9,7 +9,8 @@ public sealed class RepositoryFilterViewModel
     [EnumDataType(typeof(ProjectType)), Display(Name = "Project Type")] public ProjectType? ProjectType { get; set; }
     [StringLength(30), Display(Name = "Academic Year")] public string? AcademicYear { get; set; }
     [StringLength(50)] public string? Semester { get; set; }
-    [Range(1, int.MaxValue)] public int Page { get; set; } = 1;
+    public int Page { get; set; } = 1;
+    public int? PageSize { get; set; }
     [StringLength(150)] public string? Supervisor { get; set; }
     [EnumDataType(typeof(RepositorySort))] public RepositorySort Sort { get; set; }
     [Range(1, int.MaxValue)] public int? DepartmentId { get; set; }
@@ -24,8 +25,13 @@ public sealed record RepositoryListItem(int SubmissionId, int VersionId, int Ver
     string? StudentNumber, string Department, ProjectType ProjectType, string? AcademicYear, string? Semester,
     string? Supervisor, string Keywords, DateTime ApprovedAt);
 public sealed record RepositoryListViewModel(RepositoryScope Scope, RepositoryFilterViewModel Filter,
-    IReadOnlyList<RepositoryListItem> Items, int MatchingRecords, int PageCount, bool HasUnavailableRecords, IReadOnlyList<string>? AcademicYears = null,
-    IReadOnlyList<RepositoryDepartmentOption>? Departments = null);
+    PagedResult<RepositoryListItem> Results, bool HasUnavailableRecords, IReadOnlyList<string>? AcademicYears = null,
+    IReadOnlyList<RepositoryDepartmentOption>? Departments = null)
+{
+    public IReadOnlyList<RepositoryListItem> Items => Results.Items;
+    public int MatchingRecords => Results.TotalCount;
+    public int PageCount => Results.TotalPages;
+}
 public sealed record RepositoryDetailsViewModel(int SubmissionId, int VersionId, int VersionNumber, int ReviewRound,
     string StudentName, string? StudentNumber, string Department, string Title, string Abstract, string Keywords,
     ProjectType ProjectType, string? Supervisor, string? CourseName, string? CourseCode, string? AcademicYear,
@@ -43,9 +49,13 @@ public sealed record RepositoryDepartmentComparison(int DepartmentId, string Dep
 }
 public sealed record RepositoryApprovalTrend(int Year, int Month, int Count);
 public sealed record InstitutionRepositoryReport(int Total, int ActiveDepartmentCount, string CurrentAcademicYear, int CurrentAcademicYearCount,
-    IReadOnlyList<RepositoryDepartmentComparison> Departments, IReadOnlyList<RepositoryTypeCount> ProjectTypes,
+    PagedResult<RepositoryDepartmentComparison> DepartmentResults, IReadOnlyList<RepositoryTypeCount> ProjectTypes,
     IReadOnlyList<RepositoryGroupCount> AcademicYears, IReadOnlyList<RepositoryGroupCount> Semesters,
-    IReadOnlyList<RepositoryApprovalTrend> ApprovalTrend, IReadOnlyList<RepositoryListItem> Recent, bool HasUnavailableRecords);
+    PagedResult<RepositoryApprovalTrend> ApprovalTrendResults, IReadOnlyList<RepositoryListItem> Recent, bool HasUnavailableRecords)
+{
+    public IReadOnlyList<RepositoryDepartmentComparison> Departments => DepartmentResults.Items;
+    public IReadOnlyList<RepositoryApprovalTrend> ApprovalTrend => ApprovalTrendResults.Items;
+}
 public sealed record RepositoryCsvRow(string Title, string StudentName, string? StudentNumber, string? StudentEmail, string Department,
     ProjectType ProjectType, string? AcademicYear, string? Semester, string? Supervisor, string? CourseName, string? CourseCode,
     string Keywords, DateTime ApprovedAt, int VersionNumber, int ReviewRound, int VersionId);

@@ -17,6 +17,9 @@ public static async Task Main(string[] args)
 {
 if (args is ["--audit"]) { await AuditDatabaseAsync(); return; }
 if (args is ["--email-only"]) { await Office365EmailChecks(); return; }
+if (args is ["--pagination-only"]) { PaginationOnly(); return; }
+if (args is ["--errors-only"]) { await ErrorHandlingChecks(); return; }
+if (args is ["--security-only"]) { await SecurityChecks(); return; }
 await Office365EmailChecks();
 await MigrationUpgradeChecks();
 // Real SQL Server integration checks. Credentials are generated for this run only.

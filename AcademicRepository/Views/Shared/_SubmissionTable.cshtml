@@ -1,5 +1,11 @@
 @model IReadOnlyList<SubmissionListViewModel>
-<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Title</th><th>Type</th><th>Department</th><th>Created (UTC)</th><th>Submitted (UTC)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+@if (Model.Count == 0)
+{
+    <div class="empty-state"><span class="empty-state-icon" aria-hidden="true">▤</span><strong>No submissions yet</strong><p>Your academic submissions will appear here.</p></div>
+}
+else
+{
+<div class="table-responsive" tabindex="0" role="region" aria-label="Submission results"><table class="table table-striped"><thead><tr><th>Title</th><th>Type</th><th>Department</th><th>Created (UTC)</th><th>Submitted (UTC)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
 @foreach (var submission in Model)
 {
     <tr><td>@submission.Title</td><td>@Html.DisplayFor(_ => submission.ProjectType)</td><td>@submission.Department</td><td>@submission.CreatedAt.ToString("u")</td><td>@(submission.SubmittedAt?.ToString("u") ?? "Not submitted")</td><td><partial name="_SubmissionStatus" model="submission.Status" /></td><td>
@@ -13,4 +19,4 @@
     </td></tr>
 }
 </tbody></table></div>
-@if (Model.Count == 0) { <p>No submissions yet.</p> }
+}

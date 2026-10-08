@@ -17,9 +17,9 @@
 <dt class="col-sm-3">Semester</dt><dd class="col-sm-9">@Model.Project.Semester</dd>
 </dl>
 <h2>Files submitted</h2>
-<table class="table"><thead><tr><th>File</th><th>Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th></th></tr></thead><tbody>
+<div class="table-responsive" tabindex="0" role="region" aria-label="Submitted version files"><table class="table"><thead><tr><th>File</th><th>Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th></th></tr></thead><tbody>
 @foreach (var file in Model.Files) { <tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td><a asp-action="Download" asp-route-id="@Model.Id" asp-route-fileId="@file.Id">Download</a></td></tr> }
-</tbody></table>
+</tbody></table></div>
 <partial name="_ReviewHistory" model="Model.Reviews" />
 @if (User.IsInRole("Coordinator")) { <a asp-controller="Coordinator" asp-action="ReviewQueue">Back to Review Queue</a> }
 else { <a asp-controller="StudentSubmissions" asp-action="Details" asp-route-id="@Model.Project.Id">Back to Submission</a> }

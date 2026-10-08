@@ -1,64 +1,154 @@
 @inject AcademicRepository.Services.IOperationalSettingsService OperationalSettings
-@{ var applicationName = "Academic Project Repository"; string? supportEmail = null;
-   try { var runtimeSettings = await OperationalSettings.GetAsync(); applicationName = runtimeSettings.ApplicationDisplayName; supportEmail = runtimeSettings.SupportEmail; }
-   catch (Exception) { } }
+@{
+    var applicationName = "Academic Project Repository";
+    string? supportEmail = null;
+    try
+    {
+        var runtimeSettings = await OperationalSettings.GetAsync();
+        applicationName = runtimeSettings.ApplicationDisplayName;
+        supportEmail = runtimeSettings.SupportEmail;
+    }
+    catch (Exception) { }
+
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var action = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+    var dashboardController = User.IsInRole("Admin") ? "Admin"
+        : User.IsInRole("Student") ? "Student"
+        : User.IsInRole("Coordinator") ? "Coordinator"
+        : User.IsInRole("DepartmentHead") ? "DepartmentHead"
+        : User.IsInRole("ORICQEC") ? "ORICQEC" : "Home";
+    var displayName = User.Identity?.Name ?? "Account";
+    var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? User.Identity?.Name;
+    var roles = AcademicRepository.Data.IdentitySeeder.Roles.Where(User.IsInRole).ToArray();
+    var currentPage = ViewData["Title"]?.ToString() ?? action;
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>@ViewData["Title"] - @applicationName</title>
-<link rel="stylesheet" href="~/lib/bootstrap/bootstrap.min.css" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#102b46" />
+    <title>@currentPage - @applicationName</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
-<nav class="navbar navbar-dark bg-primary mb-4"><div class="container d-flex flex-wrap gap-3">
-<a class="navbar-brand" asp-controller="Home" asp-action="Index">@applicationName</a>
-@if (User.Identity?.IsAuthenticated == true)
-{
-    <a class="text-white" asp-controller="Home" asp-action="Index">Home</a>
-    @foreach (var role in AcademicRepository.Data.IdentitySeeder.Roles)
+<a class="skip-link" href="#mainContent">Skip to main content</a>
+<header class="app-header">
+    <button class="sidebar-toggle" type="button" aria-label="Open navigation menu" aria-controls="appSidebar" aria-expanded="false" data-sidebar-toggle>
+        <span class="menu-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
+    @if (User.Identity?.IsAuthenticated == true)
     {
-        if (User.IsInRole(role))
-        {
-            var action = role switch { "Student" => "MySubmissions", "Coordinator" => "Submissions", "DepartmentHead" => "Repository", _ => "Administration" };
-            var label = role == "Student" ? "My Submissions" : role == "DepartmentHead" ? "Academic Repository" : action;
-            <a class="text-white" asp-controller="@role" asp-action="Dashboard">@role Dashboard</a>
-            if (role == "Admin")
-            {
-                <a class="text-white" asp-controller="Departments" asp-action="Index">Departments</a>
-                <a class="text-white" asp-controller="Users" asp-action="Index">Users</a>
-                <a class="text-white" asp-controller="Admin" asp-action="Overview">Operations</a>
-                <a class="text-white" asp-controller="Admin" asp-action="SystemInformation">System Information</a>
-                <a class="text-white" asp-controller="Admin" asp-action="Diagnostics">Diagnostics</a>
-                <a class="text-white" asp-controller="Admin" asp-action="Settings">Settings</a>
-            }
-            else if (role == "ORICQEC")
-            {
-                <a class="text-white" asp-controller="ORICQEC" asp-action="Repository">Academic Repository</a>
-                <a class="text-white" asp-controller="ORICQEC" asp-action="Reports">Reports</a>
-            }
-            else
-            {
-                if (role == "Coordinator")
-                {
-                    <a class="text-white" asp-controller="Coordinator" asp-action="ReviewQueue">Review Queue</a>
-                    <a class="text-white" asp-controller="Repository" asp-action="Index">Approved Repository</a>
-                }
-                <a class="text-white" asp-controller="@role" asp-action="@action">@label</a>
-                if (role == "Student")
-                {
-                    <a class="text-white" asp-controller="StudentSubmissions" asp-action="Create">New Submission</a>
-                    <a class="text-white" asp-controller="Repository" asp-action="Index">My Approved Projects</a>
-                }
-            }
-        }
+        <a class="app-brand" asp-controller="@dashboardController" asp-action="Dashboard" aria-label="@applicationName home"><span class="brand-mark" aria-hidden="true">A</span><span class="brand-name">@applicationName</span></a>
     }
-    <form asp-controller="Account" asp-action="Logout" method="post" class="ms-auto"><button class="btn btn-outline-light" type="submit">Logout</button></form>
-}
-else { <a class="text-white" asp-controller="Account" asp-action="Login">Login</a> }
-</div></nav>
-<main class="container">
-@if (TempData["Status"] is string status) { <div class="alert alert-success" role="status">@status</div> }
-@if (TempData["Error"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
-@RenderBody()</main>
-@if (!string.IsNullOrWhiteSpace(supportEmail)) { <footer class="container mt-4 mb-3 text-muted">Support: <a href="mailto:@supportEmail">@supportEmail</a></footer> }
-</body></html>
+    else
+    {
+        <a class="app-brand" asp-controller="Account" asp-action="Login" aria-label="@applicationName sign in"><span class="brand-mark" aria-hidden="true">A</span><span class="brand-name">@applicationName</span></a>
+    }
+    <div class="header-context" aria-label="Current page"><span class="context-divider">/</span><span>@currentPage</span></div>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <details class="user-menu">
+            <summary aria-label="User account menu">
+                <span class="user-avatar" aria-hidden="true">@(displayName.Length > 0 ? displayName[..1].ToUpperInvariant() : "U")</span>
+                <span class="user-menu-copy"><strong>@displayName</strong><small>@string.Join(", ", roles)</small></span>
+                <span class="user-chevron" aria-hidden="true">▾</span>
+            </summary>
+            <div class="user-menu-panel">
+                <strong>@displayName</strong>
+                @if (!string.IsNullOrWhiteSpace(email)) { <span class="user-email">@email</span> }
+                <span class="role-chip">@string.Join(", ", roles)</span>
+                <form asp-controller="Account" asp-action="Logout" method="post">
+                    <button class="btn btn-outline-danger w-100" type="submit">Sign out</button>
+                </form>
+            </div>
+        </details>
+    }
+    else
+    {
+        <a class="btn btn-primary btn-sm ms-auto" asp-controller="Account" asp-action="Login">Sign in</a>
+    }
+</header>
+
+<div class="app-shell">
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <button class="sidebar-scrim" type="button" aria-label="Close navigation menu" data-sidebar-close tabindex="-1"></button>
+        <aside class="app-sidebar" id="appSidebar" aria-label="Main navigation">
+            <a class="sidebar-home" asp-controller="@dashboardController" asp-action="Dashboard"><span class="sidebar-home-icon" aria-hidden="true">⌂</span><span>Workspace</span></a>
+            @if (User.IsInRole("Admin"))
+            {
+                <div class="nav-section-label">Administration</div>
+                <nav class="side-nav" aria-label="Administration">
+                    <a class="side-link @(controller == "Admin" && action == "Dashboard" ? "active" : "")" asp-controller="Admin" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "Users" ? "active" : "")" asp-controller="Users" asp-action="Index"><span class="nav-icon">♙</span>Users</a>
+                    <a class="side-link @(controller == "Departments" ? "active" : "")" asp-controller="Departments" asp-action="Index"><span class="nav-icon">⌂</span>Departments</a>
+                    <a class="side-link @(controller == "Admin" && action == "Settings" ? "active" : "")" asp-controller="Admin" asp-action="Settings"><span class="nav-icon">⚙</span>System Configuration</a>
+                    <a class="side-link @(controller == "Admin" && action == "Diagnostics" ? "active" : "")" asp-controller="Admin" asp-action="Diagnostics"><span class="nav-icon">⌁</span>System Diagnostics</a>
+                    <a class="side-link @(controller == "Admin" && action == "SystemInformation" ? "active" : "")" asp-controller="Admin" asp-action="SystemInformation"><span class="nav-icon">ⓘ</span>System Information</a>
+                    <a class="side-link @(controller == "Admin" && action == "Overview" ? "active" : "")" asp-controller="Admin" asp-action="Overview"><span class="nav-icon">◷</span>Operations Overview</a>
+                </nav>
+            }
+            @if (User.IsInRole("Student"))
+            {
+                <div class="nav-section-label">Student</div>
+                <nav class="side-nav" aria-label="Student">
+                    <a class="side-link @(controller == "Student" ? "active" : "")" asp-controller="Student" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "StudentSubmissions" ? "active" : "")" asp-controller="StudentSubmissions" asp-action="Index"><span class="nav-icon">▤</span>My Submissions</a>
+                    <a class="side-link @(controller == "Repository" ? "active" : "")" asp-controller="Repository" asp-action="Index"><span class="nav-icon">◫</span>My Repository</a>
+                </nav>
+            }
+            @if (User.IsInRole("Coordinator"))
+            {
+                <div class="nav-section-label">Department</div>
+                <nav class="side-nav" aria-label="Coordinator">
+                    <a class="side-link @(controller == "Coordinator" && action == "Dashboard" ? "active" : "")" asp-controller="Coordinator" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "Coordinator" && (action == "ReviewQueue" || action == "Review") ? "active" : "")" asp-controller="Coordinator" asp-action="ReviewQueue"><span class="nav-icon">☷</span>Review Queue</a>
+                    <a class="side-link @(controller == "Repository" ? "active" : "")" asp-controller="Repository" asp-action="Index"><span class="nav-icon">◫</span>My Department Repository</a>
+                </nav>
+            }
+            @if (User.IsInRole("DepartmentHead"))
+            {
+                <div class="nav-section-label">Department</div>
+                <nav class="side-nav" aria-label="Department head">
+                    <a class="side-link @(controller == "DepartmentHead" && action == "Dashboard" ? "active" : "")" asp-controller="DepartmentHead" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "DepartmentHead" && action == "Repository" || controller == "Repository" ? "active" : "")" asp-controller="DepartmentHead" asp-action="Repository"><span class="nav-icon">◫</span>Academic Repository</a>
+                    <a class="side-link" asp-controller="DepartmentHead" asp-action="Dashboard" asp-fragment="insights"><span class="nav-icon">▥</span>Insights</a>
+                </nav>
+            }
+            @if (User.IsInRole("ORICQEC"))
+            {
+                <div class="nav-section-label">Institution</div>
+                <nav class="side-nav" aria-label="ORIC / QEC">
+                    <a class="side-link @(controller == "ORICQEC" && action == "Dashboard" ? "active" : "")" asp-controller="ORICQEC" asp-action="Dashboard"><span class="nav-icon">▦</span>Dashboard</a>
+                    <a class="side-link @(controller == "ORICQEC" && (action == "Repository" || action == "Details") ? "active" : "")" asp-controller="ORICQEC" asp-action="Repository"><span class="nav-icon">◫</span>Academic Repository</a>
+                    <a class="side-link @(controller == "ORICQEC" && action == "Reports" ? "active" : "")" asp-controller="ORICQEC" asp-action="Reports"><span class="nav-icon">▥</span>Reports</a>
+                </nav>
+            }
+            @if (!string.IsNullOrWhiteSpace(supportEmail))
+            {
+                <div class="sidebar-support"><span class="support-label">Need help?</span><a href="mailto:@supportEmail">Contact support</a></div>
+            }
+        </aside>
+    }
+    <main class="app-main" id="mainContent" tabindex="-1">
+        <div class="page-container">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-controller="@dashboardController" asp-action="Dashboard">Home</a><span aria-hidden="true">›</span><span aria-current="page">@currentPage</span></nav>
+            }
+            @if (TempData["Status"] is string status) { <div class="alert alert-success" role="status"><strong>Success</strong><span>@status</span></div> }
+            @if (TempData["Error"] is string error) { <div class="alert alert-danger" role="alert"><strong>Something needs attention</strong><span>@error</span></div> }
+            @RenderBody()
+        </div>
+        @if (!string.IsNullOrWhiteSpace(supportEmail))
+        {
+            <footer class="app-footer"><span>Academic Project Repository</span><a href="mailto:@supportEmail">Support</a></footer>
+        }
+    </main>
+</div>
+<script src="~/js/site.js" asp-append-version="true" defer></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

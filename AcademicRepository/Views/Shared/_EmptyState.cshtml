@@ -1,0 +1,6 @@
+@model EmptyStateViewModel
+<div class="empty-state" role="status">
+    <strong>@Model.Title</strong>
+    <p>@Model.Message</p>
+    @if (!string.IsNullOrWhiteSpace(Model.ResetUrl)) { <a class="btn btn-outline-secondary" href="@Model.ResetUrl">Reset Filters</a> }
+</div>

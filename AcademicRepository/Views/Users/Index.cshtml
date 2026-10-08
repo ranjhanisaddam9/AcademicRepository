@@ -1,24 +1,34 @@
 @model UserListPageViewModel
-@{ ViewData["Title"] = "Users"; }
-<div class="d-flex justify-content-between align-items-center mb-3"><h1>Users</h1><a class="btn btn-primary" asp-action="Create">Create User</a></div>
-<form method="get" class="row g-2 mb-3">
-<div class="col-md-3"><label for="search" class="form-label">Name, email or Student ID</label><input class="form-control" id="search" name="search" value="@Model.Search" /></div>
-<div class="col-md-2"><label for="role" class="form-label">Role</label><select class="form-select" id="role" name="role"><option value="">All</option>@foreach(var r in AcademicRepository.Data.IdentitySeeder.Roles){<option selected="@(Model.Role==r)" value="@r">@r</option>}</select></div>
-<div class="col-md-3"><label for="departmentId" class="form-label">Department</label><select class="form-select" id="departmentId" name="departmentId"><option value="">All</option>@foreach(var d in Model.Departments){<option selected="@(Model.DepartmentId?.ToString()==d.Value)" value="@d.Value">@d.Text</option>}</select></div>
-<div class="col-md-2"><label for="isActive" class="form-label">Account status</label><select class="form-select" id="isActive" name="isActive"><option value="">All</option><option value="true" selected="@(Model.IsActive==true)">Active</option><option value="false" selected="@(Model.IsActive==false)">Inactive</option></select></div>
-<div class="col-md-2 align-self-end"><button class="btn btn-primary">Filter</button> <a class="btn btn-outline-secondary" asp-action="Index">Clear</a></div></form>
-<p>@Model.Total account(s); page @Model.Page of @Model.PageCount.</p>
-<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Name</th><th>Email</th><th>Student ID</th><th>Role</th><th>Department</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-@foreach (var user in Model.Users)
-{
-    <tr><td>@user.FullName</td><td>@user.Email</td><td>@(user.StudentNumber ?? "—")</td><td>@user.Role</td><td>@user.Department</td><td>@(user.IsActive ? "Active" : "Inactive")</td><td>
-        @if (!user.Role.Split(", ").Contains("Student")) { <a asp-action="Edit" asp-route-id="@user.Id">Edit staff</a> }
-        @if (!user.Role.Split(", ").Contains("Student")) { <span> | </span><a asp-action="ResetPassword" asp-route-id="@user.Id">Reset Password</a> }
-        <form class="d-inline ms-2" asp-action="SetActive" asp-route-id="@user.Id" method="post"><input type="hidden" name="isActive" value="@((!user.IsActive).ToString())" /><button class="btn btn-sm btn-outline-secondary">@(user.IsActive ? "Deactivate" : "Activate")</button></form>
-    </td></tr>
+@{
+    ViewData["Title"] = "Users";
+    var fields = new List<FilterFieldViewModel>
+    {
+        new("search", "Name, email or Student ID", Model.Search, "search", "Search users", 200),
+        new("role", "Role", Model.Role ?? "", "select", Options: new[] { new FilterOptionViewModel("", "All roles") }.Concat(AcademicRepository.Data.IdentitySeeder.Roles.Select(r => new FilterOptionViewModel(r, r))).ToArray()),
+        new("departmentId", "Department", Model.DepartmentId?.ToString() ?? "", "select", Options: new[] { new FilterOptionViewModel("", "All departments") }.Concat(Model.Departments.Select(d => new FilterOptionViewModel(d.Value!, d.Text!))).ToArray()),
+        new("isActive", "Account status", Model.IsActive?.ToString().ToLowerInvariant() ?? "", "select", Options: new[] { new FilterOptionViewModel("", "All statuses"), new("true", "Active"), new("false", "Inactive") })
+    };
+    var filter = new FilterPanelViewModel("Index", "Users", "Index", fields, Model.PageSize);
+    var route = new Dictionary<string, string> { ["search"] = Model.Search ?? "", ["role"] = Model.Role ?? "", ["departmentId"] = Model.DepartmentId?.ToString() ?? "", ["isActive"] = Model.IsActive?.ToString().ToLowerInvariant() ?? "", ["pageSize"] = Model.PageSize.ToString(), ["direction"] = Model.Direction, ["sort"] = Model.Sort };
+    var tableRows = Model.Users.Select(u => new DataTableRowViewModel(new DataTableCellViewModel[]
+    {
+        new(u.FullName), new(u.Email), new(u.StudentNumber ?? "—"), new(u.Role), new(u.Department), new(u.IsActive ? "Active" : "Inactive", u.IsActive ? "bg-success" : "bg-secondary")
+    }, BuildActions(u))).ToArray();
+    IReadOnlyList<DataTableActionViewModel> BuildActions(UserListItem u)
+    {
+        var actions = new List<DataTableActionViewModel>();
+        if (!u.Role.Split(", ").Contains("Student"))
+        {
+            actions.Add(new("Edit staff", Url.Action("Edit", "Users", new { id = u.Id }) ?? "#"));
+            actions.Add(new("Reset password", Url.Action("ResetPassword", "Users", new { id = u.Id }) ?? "#"));
+        }
+        actions.Add(new(u.IsActive ? "Deactivate" : "Activate", "#", "btn btn-sm btn-link text-start", "Users", "SetActive", u.Id, true, "isActive", (!u.IsActive).ToString().ToLowerInvariant()));
+        return actions;
+    }
+    var table = new DataTableViewModel("Index", "Users", new[] { new DataTableColumnViewModel("Name", "Name"), new("Email", "Email"), new("Student ID", "StudentNumber"), new("Role"), new("Department"), new("Status") }, tableRows, Model.Sort, Model.Direction, route, "No users found", "Try changing your search or filters.", Url.Action("Index", "Users"));
+    var pagination = new PaginationViewModel("Index", "Users", Model.Page, Model.PageSize, Model.Total, "User", route);
 }
-</tbody></table></div>
-@if (Model.Users.Count == 0) { <p>No users match this list.</p> }
-@if (Model.PageCount > 1) { <nav aria-label="Users pages"><ul class="pagination">
-@for (var p = 1; p <= Model.PageCount; p++) { <li class="page-item @(p==Model.Page ? "active" : "")"><a class="page-link" asp-action="Index" asp-route-search="@Model.Search" asp-route-role="@Model.Role" asp-route-departmentId="@Model.DepartmentId" asp-route-isActive="@Model.IsActive" asp-route-page="@p">@p</a></li> }
-</ul></nav> }
+<div class="d-flex justify-content-between align-items-center mb-3"><h1>Users</h1><a class="btn btn-primary" asp-action="Create">Create User</a></div>
+<partial name="_FilterPanel" model="filter" />
+<partial name="_DataTable" model="table" />
+<partial name="_Pagination" model="pagination" />

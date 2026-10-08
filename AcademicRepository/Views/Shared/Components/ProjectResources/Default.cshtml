@@ -1,25 +1,25 @@
 @model ResourceListViewModel
-<section class="mt-4 border-top pt-3">
+<section class="section-card mt-4">
 <h2>Resource Materials</h2>
 @if (Model.CanManage)
 {
 <p>Save any project edits before uploading. Up to @Model.MaxFilesPerSubmission files, @Model.MaxFileSizeMB MB each.</p>
-<form asp-controller="ProjectFiles" asp-action="Upload" asp-route-id="@Model.SubmissionId" method="post" enctype="multipart/form-data" style="max-width:850px">
+<form asp-controller="ProjectFiles" asp-action="Upload" asp-route-id="@Model.SubmissionId" method="post" enctype="multipart/form-data" class="file-upload-panel" style="max-width:900px" data-loading-text="Uploading resource…">
 <div class="mb-3"><label for="resource-type" class="form-label">Resource Type</label><select id="resource-type" name="ResourceType" asp-items="Html.GetEnumSelectList<ProjectResourceType>()" class="form-select" required><option value="">Select a resource type</option></select></div>
 <div class="mb-3"><label for="resource-description" class="form-label">Description (optional)</label><textarea id="resource-description" name="Description" maxlength="1000" class="form-control"></textarea></div>
-<div class="mb-3"><label for="resource-file" class="form-label">File</label><input id="resource-file" name="File" type="file" class="form-control" accept="@string.Join(",", AcademicRepository.Services.ResourceFileValidator.ContentTypes.Keys)" required /></div>
+<div class="mb-3"><label for="resource-file" class="form-label">File</label><input id="resource-file" name="File" type="file" class="form-control" accept="@string.Join(",", AcademicRepository.Services.ResourceFileValidator.ContentTypes.Keys)" aria-describedby="resource-file-help resource-file-selected" required /><div id="resource-file-help" class="form-text">Choose one file, up to @Model.MaxFileSizeMB MB.</div><div id="resource-file-selected" class="form-text" aria-live="polite">No file selected.</div></div>
 <button class="btn btn-primary" type="submit">Upload Resource</button>
 </form>
 }
 else { <p>This submission is read-only. You may download your resources.</p> }
-<h3 class="h5 mt-3">Uploaded Resources</h3>
-@if (Model.Files.Count == 0) { <p>No resources uploaded.</p> }
+<h3 class="h5 mt-4">Uploaded Resources</h3>
+@if (Model.Files.Count == 0) { <div class="empty-state"><span class="empty-state-icon" aria-hidden="true">↥</span><strong>No resources uploaded</strong><p>Uploaded project materials will be listed here.</p></div> }
 else
 {
-<div class="table-responsive"><table class="table"><thead><tr><th>File</th><th>Resource Type</th><th>Description</th><th>Size</th><th>Uploaded (UTC)</th><th>Actions</th></tr></thead><tbody>
+<div class="table-responsive" tabindex="0" role="region" aria-label="Project resource files"><table class="table"><thead><tr><th>File</th><th>Resource Type</th><th>Description</th><th>Size</th><th>Status</th><th>Uploaded (UTC)</th><th>Actions</th></tr></thead><tbody>
 @foreach (var file in Model.Files)
 {
-<tr><td>@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td>@file.UploadedAt.ToString("u")</td><td>
+<tr><td class="file-name">@file.OriginalFileName</td><td>@Html.DisplayFor(_ => file.ResourceType)</td><td>@file.Description</td><td>@file.DisplaySize</td><td><span class="badge bg-success">Available</span></td><td>@file.UploadedAt.ToString("u")</td><td>
 <a asp-controller="ProjectFiles" asp-action="Download" asp-route-id="@file.Id" class="btn btn-sm btn-outline-primary">Download</a>
 @if (Model.CanManage) { <form class="d-inline" asp-controller="ProjectFiles" asp-action="Delete" asp-route-id="@file.Id" method="post"><button class="btn btn-sm btn-outline-danger" type="submit">Delete</button></form> }
 </td></tr>
