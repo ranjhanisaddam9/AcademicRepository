@@ -1,1 +1,5 @@
-@{ Layout = "_Layout"; }
+@{
+    var isAccountPage = ViewContext.RouteData.Values["controller"]?.ToString() == "Account"
+        && ViewContext.RouteData.Values["action"]?.ToString() != "AccessDenied";
+    Layout = isAccountPage ? "_AuthLayout" : "_Layout";
+}

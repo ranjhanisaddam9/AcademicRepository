@@ -17,6 +17,7 @@ public class AccountController(SignInManager<ApplicationUser> signInManager, Aut
     [AllowAnonymous, HttpPost, EnableRateLimiting("authentication")]
     public async Task<IActionResult> Login(LoginViewModel model)
     {
+        model.SignInMode = "staff";
         if (!ModelState.IsValid) return View(model);
         var result = await signInManager.PasswordSignInAsync(model.Email.Trim(), model.Password, model.RememberMe, lockoutOnFailure: true);
         if (result.Succeeded)

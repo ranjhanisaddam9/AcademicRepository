@@ -10,6 +10,7 @@ public sealed class LoginViewModel
     public string Password { get; set; } = "";
     public bool RememberMe { get; set; }
     public string? ReturnUrl { get; set; }
+    public string SignInMode { get; set; } = "student";
 }
 
 public sealed record DashboardViewModel(string FullName, IReadOnlyList<string> Roles, string Department, int? DepartmentCount = null, int? UserCount = null);

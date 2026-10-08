@@ -1,0 +1,36 @@
+@{
+    var pageTitle = ViewData["Title"]?.ToString() ?? "Sign in";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#102b46" />
+    <title>@pageTitle - Academic Project Repository</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="auth-body">
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
+    <header class="auth-header">
+        <a class="auth-brand" asp-controller="Account" asp-action="Login" aria-label="Academic Project Repository sign in">
+            <span class="auth-brand-mark" aria-hidden="true"><span></span><span></span></span>
+            <span class="auth-brand-copy"><strong>Academic Project Repository</strong><small>Sindh Madressatul Islam University</small></span>
+        </a>
+        <a class="auth-university-link" href="https://www.smiu.edu.pk/" target="_blank" rel="noopener noreferrer">
+            <span aria-hidden="true">↗</span> University website
+        </a>
+    </header>
+    <main id="mainContent" class="auth-main" tabindex="-1">
+        @RenderBody()
+    </main>
+    <footer class="auth-footer">
+        <span>Academic work. Preserved with care.</span>
+        <span>SMIU · Karachi, Pakistan</span>
+    </footer>
+    <partial name="_ConfirmDialog" />
+    <script src="~/js/site.js" asp-append-version="true" defer></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

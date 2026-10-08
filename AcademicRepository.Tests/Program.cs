@@ -22,6 +22,7 @@ if (args is ["--errors-only"]) { await ErrorHandlingChecks(); return; }
 if (args is ["--security-only"]) { await SecurityChecks(); return; }
 if (args is ["--accessibility-only"]) { AccessibilityChecks(); return; }
 if (args is ["--concurrency-only"]) { ConcurrencyChecks.Run(); return; }
+if (args is ["--login-ui-only"]) { LoginUiChecks.Run(); return; }
 await Office365EmailChecks();
 await MigrationUpgradeChecks();
 // Real SQL Server integration checks. Credentials are generated for this run only.

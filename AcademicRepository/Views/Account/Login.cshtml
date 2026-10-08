@@ -1,15 +1,91 @@
 @model LoginViewModel
-@{ ViewData["Title"] = "Login"; }
-<div class="mx-auto" style="max-width:420px">
-<h1>Sign In</h1>
-<section class="card card-body mb-4"><h2>Student Sign In</h2><p>Use your SMIU email address. A verification code will be emailed to you.</p><a class="btn btn-outline-primary" asp-action="StudentSignIn">Student Sign In</a></section>
-<h2>Staff Sign In</h2><p>For Admin, Coordinator, Department Head and ORIC / QEC. Use your assigned @@smiu.edu.pk account.</p>
-<p class="small">Coordinator accounts require an assigned department. Department Head accounts also require an assigned department. Contact your administrator if your department is missing.</p>
-<form asp-action="Login" method="post">
-<input asp-for="ReturnUrl" type="hidden" />
-<div asp-validation-summary="All" class="text-danger" role="alert"></div>
-<div class="mb-3"><label asp-for="Email" class="form-label"></label><input asp-for="Email" class="form-control" autocomplete="username" /><span asp-validation-for="Email" class="field-validation-error"></span></div>
-<div class="mb-3"><label asp-for="Password" class="form-label"></label><input asp-for="Password" class="form-control" autocomplete="current-password" /><span asp-validation-for="Password" class="field-validation-error"></span></div>
-<div class="form-check mb-3"><input asp-for="RememberMe" class="form-check-input" /><label asp-for="RememberMe" class="form-check-label">Remember me</label></div>
-<button type="submit" class="btn btn-primary">Sign In</button> <a asp-action="ForgotPassword">Forgot Password</a>
-</form></div>
+@{
+    ViewData["Title"] = "Sign in";
+    var returnUrl = Model.ReturnUrl;
+    var staffSelected = string.Equals(Model.SignInMode, "staff", StringComparison.OrdinalIgnoreCase);
+}
+<div class="auth-landing">
+    <section class="auth-intro" aria-labelledby="authWelcome">
+        <div class="auth-eyebrow"><span class="auth-eyebrow-dot" aria-hidden="true"></span> SMIU · ACADEMIC WORKSPACE</div>
+        <h1 id="authWelcome">A home for ideas<br /><em>worth keeping.</em></h1>
+        <p class="auth-intro-copy">Submit, review and discover the academic work shaping our university.</p>
+        <div class="auth-campus-art" aria-hidden="true">
+            <div class="art-sun"></div>
+            <div class="art-arch art-arch-back"></div>
+            <div class="art-arch art-arch-front">
+                <div class="art-building">
+                    <div class="art-roof"></div>
+                    <div class="art-floor art-floor-top"><i></i><i></i><i></i><i></i><i></i></div>
+                    <div class="art-floor art-floor-mid"><i></i><i></i><i></i><i></i><i></i></div>
+                    <div class="art-columns"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                    <div class="art-building-base"></div>
+                </div>
+            </div>
+            <div class="art-ground"></div>
+            <div class="art-caption"><span>LEARN · RESEARCH · CONTRIBUTE</span><span class="art-caption-line"></span></div>
+        </div>
+        <div class="auth-principles" aria-label="Repository principles">
+            <span><b aria-hidden="true">01</b> Student research</span>
+            <span><b aria-hidden="true">02</b> Faculty review</span>
+            <span><b aria-hidden="true">03</b> Shared knowledge</span>
+        </div>
+    </section>
+
+    <section class="auth-card" aria-labelledby="signInHeading">
+        <div class="auth-card-heading">
+            <span class="auth-card-kicker">YOUR UNIVERSITY, YOUR WORK</span>
+            <h2 id="signInHeading">Welcome back</h2>
+            <p>Choose how you’d like to continue.</p>
+        </div>
+
+        <fieldset class="auth-mode-switch">
+            <legend class="visually-hidden">Choose sign-in method</legend>
+            <input class="auth-mode-input" type="radio" name="signInMode" id="signin-student" value="student" checked="@(!staffSelected)" />
+            <label for="signin-student"><span aria-hidden="true">✦</span> Student</label>
+            <input class="auth-mode-input" type="radio" name="signInMode" id="signin-staff" value="staff" checked="@staffSelected" />
+            <label for="signin-staff"><span aria-hidden="true">▤</span> Staff</label>
+        </fieldset>
+
+        <div class="auth-panels">
+            <section class="auth-panel student-panel" aria-labelledby="studentSignInHeading">
+                <h3 id="studentSignInHeading">Student sign in</h3>
+                <p>Use your university email. We’ll send a one-time verification code; no password is needed.</p>
+                <form asp-controller="Account" asp-action="StudentSignIn" method="post">
+                    <div class="mb-3">
+                        <label for="studentEmail" class="form-label">SMIU student email</label>
+                        <input id="studentEmail" name="Email" type="email" class="form-control" autocomplete="email" placeholder="CSC20F005@smiu.edu.pk" required maxlength="256" />
+                        <div class="form-text">Example: CSC20F005@smiu.edu.pk</div>
+                    </div>
+                    <button class="btn btn-primary auth-submit" type="submit">Continue with email <span aria-hidden="true">→</span></button>
+                </form>
+                <div class="auth-secure-note"><span aria-hidden="true">⌑</span> Your student account is verified through your SMIU inbox.</div>
+            </section>
+
+            <section class="auth-panel staff-panel" aria-labelledby="staffSignInHeading">
+                <h3 id="staffSignInHeading">Staff sign in</h3>
+                <p>For administrators, coordinators, department heads and ORIC / QEC.</p>
+                <form asp-controller="Account" asp-action="Login" method="post">
+                    <input asp-for="ReturnUrl" type="hidden" />
+                    <div asp-validation-summary="All" class="text-danger auth-validation" role="alert"></div>
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label">University email</label>
+                        <input asp-for="Email" class="form-control" autocomplete="username" placeholder="name@smiu.edu.pk" />
+                        <span asp-validation-for="Email" class="field-validation-error"></span>
+                    </div>
+                    <div class="mb-2">
+                        <label asp-for="Password" class="form-label">Password</label>
+                        <input asp-for="Password" class="form-control" autocomplete="current-password" placeholder="Enter your password" />
+                        <span asp-validation-for="Password" class="field-validation-error"></span>
+                    </div>
+                    <div class="auth-form-meta">
+                        <div class="form-check"><input asp-for="RememberMe" class="form-check-input" /><label asp-for="RememberMe" class="form-check-label">Remember me</label></div>
+                        <a asp-action="ForgotPassword">Forgot password?</a>
+                    </div>
+                    <button type="submit" class="btn btn-primary auth-submit">Sign in to your workspace <span aria-hidden="true">→</span></button>
+                </form>
+                <div class="auth-secure-note"><span aria-hidden="true">⌑</span> Staff access is protected by your assigned university account.</div>
+            </section>
+        </div>
+        <div class="auth-help">Having trouble signing in? <a href="https://www.smiu.edu.pk/" target="_blank" rel="noopener noreferrer">Visit SMIU</a></div>
+    </section>
+</div>
